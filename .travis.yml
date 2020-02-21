@@ -55,13 +55,6 @@ matrix:
           - /usr/local/Cellar/libzip
           - /usr/local/opt/libzip
 
-notifications:
-  irc:
-    channels:
-      - "chat.freenode.net#openscad"
-    on_success: change
-    use_notice: false
-
 branches:
   only:
     - master
