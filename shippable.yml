@@ -3,7 +3,7 @@ language: none
 sudo: required
 
 runtime:
-  nodePool: shippable_shared_aarch32
+  nodePool: shippable_shared_aarch64
  
 build:
  ci:
