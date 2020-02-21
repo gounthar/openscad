@@ -5,14 +5,8 @@ sudo: required
 runtime:
   nodePool: shippable_shared_aarch32
  
-integrations:
-  hub:
-    - integrationName: docker_hub
-      type: dockerRegistryLogin    
-  
 build:
  ci:
-  - ARCH=armhf docker/armv7l/mkimage-alpine.sh
-  - docker build -f docker/armv7l/Dockerfile -t gounthar/stf-armv7l:latest .
- post_ci:
-  - docker push gounthar/stf-armv7l:latest
+  - apt update && apt upgrade && apt install git
+  - git clone git://github.com/openscad/openscad.git && cd openscad && git submodule update --init
+  - ./scripts/uni-get-dependencies.sh && qmake openscad.pro && make -j 24
