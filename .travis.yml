@@ -16,6 +16,7 @@ matrix:
         - PARALLEL_CTEST=-j4
       before_install:
         # Fix for "write error" build failures  ( https://github.com/travis-ci/travis-ci/issues/8920 )
+        - apt install -y imagemagick
         - python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"
         - ./scripts/travis-ci-before-install-linux.sh "$TRAVIS_DIST"
       cache:
