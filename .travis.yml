@@ -1,8 +1,13 @@
+arch:
+  - amd64
+  - arm64
+
 language: cpp
 
 matrix:
   include:
     - os: linux
+      arch: arm64
       sudo: required
       compiler: gcc
       dist: xenial
