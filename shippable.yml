@@ -1,0 +1,18 @@
+language: none
+
+sudo: required
+
+runtime:
+  nodePool: shippable_shared_aarch32
+ 
+integrations:
+  hub:
+    - integrationName: docker_hub
+      type: dockerRegistryLogin    
+  
+build:
+ ci:
+  - ARCH=armhf docker/armv7l/mkimage-alpine.sh
+  - docker build -f docker/armv7l/Dockerfile -t gounthar/stf-armv7l:latest .
+ post_ci:
+  - docker push gounthar/stf-armv7l:latest
