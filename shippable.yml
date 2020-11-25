@@ -9,4 +9,4 @@ build:
  ci:
   - apt update && apt upgrade && apt install git
   - git clone git://github.com/openscad/openscad.git && cd openscad && git submodule update --init
-  - ./scripts/uni-get-dependencies.sh && qmake openscad.pro && make -j $(nproc)
+  - ./scripts/uni-get-dependencies.sh && qmake openscad.pro && make
