@@ -7,6 +7,7 @@ runtime:
  
 build:
  ci:
+  - curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
   - apt update && apt upgrade && apt install git libcgal-dev
   - git clone git://github.com/openscad/openscad.git && cd openscad && git submodule update --init
   - ./scripts/uni-get-dependencies.sh && qmake openscad.pro && make
