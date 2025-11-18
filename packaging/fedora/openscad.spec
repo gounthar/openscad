@@ -3,9 +3,13 @@ Version:        2024.11.18
 Release:        1%{?dist}
 Summary:        The Programmers Solid 3D CAD Modeller
 
+# Upstream commit for this build
+%global commit 63150dbbae53b2c8dbd75143a57409e60c1eb404
+%global shortcommit %(c=%{commit}; echo ${c:0:7})
+
 License:        GPL-2.0-or-later
 URL:            https://openscad.org/
-Source0:        https://github.com/openscad/openscad/archive/%{version}.tar.gz
+Source0:        https://github.com/openscad/openscad/archive/%{commit}/openscad-%{shortcommit}.tar.gz
 
 BuildRequires:  cmake >= 3.5
 BuildRequires:  gcc-c++
@@ -31,7 +35,9 @@ BuildRequires:  glew-devel >= 1.5.4
 BuildRequires:  gmp-devel
 BuildRequires:  mpfr-devel
 BuildRequires:  python3
-BuildRequires:  boost-devel >= 1.61.0
+BuildRequires:  boost-regex-devel >= 1.61.0
+BuildRequires:  boost-system-devel >= 1.61.0
+BuildRequires:  boost-filesystem-devel >= 1.61.0
 BuildRequires:  pkgconf
 BuildRequires:  ImageMagick
 BuildRequires:  mesa-libGL-devel
@@ -60,7 +66,7 @@ process or make designs that are defined by configurable parameters.
 This package provides multi-architecture builds (x86_64, aarch64, riscv64).
 
 %prep
-%autosetup -n openscad-%{version}
+%autosetup -n openscad-%{commit}
 
 %build
 %cmake -DEXPERIMENTAL=1 -DCMAKE_BUILD_TYPE=Release

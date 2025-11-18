@@ -27,9 +27,6 @@ override_dh_auto_build:
 override_dh_auto_install:
 	dh_auto_install --destdir=debian/openscad
 
-	# Create documentation directory
-	install -d debian/openscad/usr/share/doc/openscad
-
 	# Remove bundled libraries (use system packages instead)
 	rm -rf debian/openscad/usr/share/openscad/libraries
 	rm -rf debian/openscad/usr/share/openscad/fonts

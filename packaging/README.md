@@ -23,16 +23,19 @@ Contains complete Debian packaging files:
 **Build locally:**
 
 ```bash
-# Install build dependencies
-sudo apt-get install build-essential debhelper devscripts cmake \
-    qtbase5-dev libcgal-dev libopencsg-dev libqscintilla2-qt5-dev \
-    # ... (see control file for full list)
-
 # Copy packaging to upstream source
 cp -r packaging/debian upstream/debian
+cd upstream
+
+# Install build dependencies (reads from debian/control)
+sudo apt-get build-dep .
+
+# Or manually install if apt-get build-dep doesn't work:
+# sudo apt-get install build-essential debhelper devscripts cmake \
+#     qtbase5-dev libcgal-dev libopencsg-dev libqscintilla2-qt5-dev \
+#     ... (see debian/control for full list)
 
 # Build package
-cd upstream
 dpkg-buildpackage -us -uc -b
 
 # Packages will be in parent directory
@@ -50,6 +53,9 @@ Contains RPM spec file:
 ```bash
 # Install build dependencies
 sudo dnf builddep packaging/fedora/openscad.spec
+
+# Download source tarball
+spectool -g -R packaging/fedora/openscad.spec
 
 # Build RPM
 rpmbuild -bb packaging/fedora/openscad.spec
