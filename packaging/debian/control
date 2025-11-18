@@ -37,6 +37,7 @@ Build-Depends:
     xvfb,
     libgl-dev,
     libdouble-conversion-dev,
+    libtbb-dev,
     git
 Standards-Version: 4.7.0
 Rules-Requires-Root: no

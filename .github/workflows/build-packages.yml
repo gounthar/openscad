@@ -78,7 +78,8 @@ jobs:
             libgl1-mesa-dri \
             xvfb \
             libgl-dev \
-            libdouble-conversion-dev
+            libdouble-conversion-dev \
+            libtbb-dev
 
       - name: Prepare source
         run: |
@@ -155,7 +156,8 @@ jobs:
             libgl1-mesa-dri \
             xvfb \
             libgl-dev \
-            libdouble-conversion-dev
+            libdouble-conversion-dev \
+            libtbb-dev
 
       - name: Prepare source
         run: |
@@ -230,7 +232,8 @@ jobs:
             libgl1-mesa-dri \
             xvfb \
             libgl-dev \
-            libdouble-conversion-dev
+            libdouble-conversion-dev \
+            libtbb-dev
 
       - name: Prepare source
         run: |

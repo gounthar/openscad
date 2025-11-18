@@ -45,6 +45,7 @@ BuildRequires:  mesa-libGL-devel
 BuildRequires:  mesa-dri-drivers
 BuildRequires:  xorg-x11-server-Xvfb
 BuildRequires:  double-conversion-devel
+BuildRequires:  tbb-devel
 BuildRequires:  git
 
 Requires:       qt5-qtbase
