@@ -1,0 +1,114 @@
+name: Cleanup Old Releases
+
+on:
+  schedule:
+    # Run weekly on Sundays at midnight UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Delete releases older than N days'
+        type: number
+        default: 30
+      dry_run:
+        description: 'Dry run (list but do not delete)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: Delete Old Releases
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine retention period
+        id: config
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            DAYS="${{ inputs.days }}"
+            DRY_RUN="${{ inputs.dry_run }}"
+          else
+            DAYS="30"
+            DRY_RUN="false"
+          fi
+          echo "days=${DAYS}" >> $GITHUB_OUTPUT
+          echo "dry_run=${DRY_RUN}" >> $GITHUB_OUTPUT
+          echo "cutoff_date=$(date -d "${DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+
+      - name: List releases to delete
+        id: list
+        run: |
+          CUTOFF="${{ steps.config.outputs.cutoff_date }}"
+          echo "Looking for releases older than ${CUTOFF}..."
+
+          # Get all releases and filter by date
+          RELEASES=$(gh release list --json tagName,publishedAt,isPrerelease \
+            --jq ".[] | select(.publishedAt < \"${CUTOFF}\") | .tagName")
+
+          if [ -z "$RELEASES" ]; then
+            echo "No releases found older than ${{ steps.config.outputs.days }} days."
+            echo "count=0" >> $GITHUB_OUTPUT
+          else
+            echo "Releases to delete:"
+            echo "$RELEASES"
+            echo "releases<<EOF" >> $GITHUB_OUTPUT
+            echo "$RELEASES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            COUNT=$(echo "$RELEASES" | wc -l)
+            echo "count=${COUNT}" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Delete old releases
+        if: steps.list.outputs.count != '0' && steps.config.outputs.dry_run == 'false'
+        run: |
+          echo "Deleting ${{ steps.list.outputs.count }} releases..."
+
+          echo "${{ steps.list.outputs.releases }}" | while read tag; do
+            if [ -n "$tag" ]; then
+              echo "Deleting release: ${tag}"
+              gh release delete "${tag}" --yes --cleanup-tag
+            fi
+          done
+
+          echo "Cleanup complete!"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Dry run summary
+        if: steps.list.outputs.count != '0' && steps.config.outputs.dry_run == 'true'
+        run: |
+          echo "DRY RUN - Would delete the following releases:"
+          echo "${{ steps.list.outputs.releases }}"
+
+      - name: Summary
+        run: |
+          echo "## Release Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Retention period:** ${{ steps.config.outputs.days }} days" >> $GITHUB_STEP_SUMMARY
+          echo "**Cutoff date:** ${{ steps.config.outputs.cutoff_date }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry run:** ${{ steps.config.outputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.list.outputs.count }}" = "0" ]; then
+            echo "No releases older than ${{ steps.config.outputs.days }} days found." >> $GITHUB_STEP_SUMMARY
+          else
+            if [ "${{ steps.config.outputs.dry_run }}" = "true" ]; then
+              echo "### Releases to be deleted" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "### Releases deleted" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.list.outputs.releases }}" | while read tag; do
+              if [ -n "$tag" ]; then
+                echo "- ${tag}" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+          fi

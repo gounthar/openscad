@@ -1,0 +1,199 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 2024.11.18)'
+        type: string
+        required: true
+      prerelease:
+        description: 'Mark as pre-release'
+        type: boolean
+        default: true
+      run_id:
+        description: 'Workflow run ID to download artifacts from (leave empty for latest)'
+        type: string
+        required: false
+  workflow_run:
+    workflows: ["Package from Docker Image"]
+    types:
+      - completed
+    branches:
+      - multiplatform
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # Use date-based version for automatic releases
+            VERSION=$(date +%Y.%m.%d)
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Determine workflow run ID
+        id: run
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "${{ inputs.run_id }}" ]; then
+              echo "run_id=${{ inputs.run_id }}" >> $GITHUB_OUTPUT
+            else
+              # Get the latest successful packaging workflow run
+              RUN_ID=$(gh run list --workflow=package-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+              echo "run_id=${RUN_ID}" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download artifacts from packaging workflow
+        run: |
+          mkdir -p packages
+
+          echo "Downloading artifacts from run ${{ steps.run.outputs.run_id }}..."
+
+          # Download all artifacts from the packaging workflow
+          gh run download ${{ steps.run.outputs.run_id }} --dir packages
+
+          # List downloaded files
+          echo "Downloaded packages:"
+          find packages -name "*.deb" -type f
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Prepare release assets
+        id: assets
+        run: |
+          mkdir -p release-assets
+
+          # Move all .deb files to release-assets with flat structure
+          find packages -name "*.deb" -exec cp {} release-assets/ \;
+
+          # List assets
+          echo "Release assets:"
+          ls -lh release-assets/
+
+          # Count packages
+          if ls release-assets/*.deb 1>/dev/null 2>&1; then
+            COUNT=$(ls release-assets/*.deb | wc -l)
+          else
+            COUNT=0
+            echo "Warning: No .deb files found in release-assets"
+          fi
+          echo "count=${COUNT}" >> $GITHUB_OUTPUT
+
+      - name: Check if release already exists
+        id: check
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" &>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Delete existing release if needed
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          echo "Deleting existing release ${{ steps.version.outputs.tag }}..."
+          gh release delete "${{ steps.version.outputs.tag }}" --yes --cleanup-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Create GitHub Release
+        run: |
+          # Determine if prerelease
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PRERELEASE="${{ inputs.prerelease }}"
+          else
+            PRERELEASE="true"
+          fi
+
+          # Build release notes
+          cat > release-notes.md << 'EOF'
+          ## OpenSCAD Multi-Architecture Packages
+
+          Pre-built Debian packages for multiple architectures, extracted from Docker images.
+
+          ### Supported Architectures
+          - **amd64** (x86_64)
+          - **arm64** (aarch64)
+          - **riscv64**
+
+          ### Installation
+
+          ```bash
+          # Download the appropriate .deb for your architecture
+          sudo dpkg -i openscad_${{ steps.version.outputs.version }}-1_<arch>.deb
+
+          # Install any missing dependencies
+          sudo apt-get install -f
+          ```
+
+          ### Docker Images
+
+          Docker images are also available:
+          ```bash
+          docker pull ghcr.io/gounthar/openscad:latest
+          ```
+
+          ### Build Information
+          - Built from commit: ${{ github.sha }}
+          - Workflow run: ${{ steps.run.outputs.run_id }}
+          EOF
+
+          # Create release with assets
+          if [ "${PRERELEASE}" = "true" ]; then
+            gh release create "${{ steps.version.outputs.tag }}" \
+              --title "OpenSCAD ${{ steps.version.outputs.version }}" \
+              --notes-file release-notes.md \
+              --prerelease \
+              release-assets/*.deb
+          else
+            gh release create "${{ steps.version.outputs.tag }}" \
+              --title "OpenSCAD ${{ steps.version.outputs.version }}" \
+              --notes-file release-notes.md \
+              release-assets/*.deb
+          fi
+
+          echo "Release created: ${{ steps.version.outputs.tag }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Summary
+        run: |
+          echo "## Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Packages:** ${{ steps.assets.outputs.count }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Assets" >> $GITHUB_STEP_SUMMARY
+          if ls release-assets/*.deb 1>/dev/null 2>&1; then
+            ls release-assets/*.deb | while read pkg; do
+              name=$(basename "$pkg")
+              size=$(du -h "$pkg" | cut -f1)
+              echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
+            done
+          else
+            echo "No packages found" >> $GITHUB_STEP_SUMMARY
+          fi
