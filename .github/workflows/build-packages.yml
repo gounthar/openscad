@@ -1,0 +1,274 @@
+name: Build Distribution Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_debian:
+        description: 'Build Debian packages'
+        type: boolean
+        default: true
+      build_rpm:
+        description: 'Build RPM packages'
+        type: boolean
+        default: false
+  push:
+    branches:
+      - multiplatform
+    paths:
+      - 'packaging/**'
+      - '.github/workflows/build-packages.yml'
+  pull_request:
+    branches:
+      - multiplatform
+    paths:
+      - 'packaging/**'
+      - '.github/workflows/build-packages.yml'
+
+jobs:
+  build-debian-amd64:
+    name: Build Debian (amd64)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_debian }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            debhelper \
+            devscripts \
+            cmake \
+            qtbase5-dev \
+            libcgal-dev \
+            libopencsg-dev \
+            libqscintilla2-qt5-dev \
+            qtmultimedia5-dev \
+            libfreetype-dev \
+            libfontconfig-dev \
+            libharfbuzz-dev \
+            libeigen3-dev \
+            libglib2.0-dev \
+            libxml2-dev \
+            libzip-dev \
+            libcairo2-dev \
+            lib3mf-dev \
+            libspnav-dev \
+            libqt5gamepad5-dev \
+            bison \
+            flex \
+            libqt5opengl5-dev \
+            libglew-dev \
+            libgmp-dev \
+            libmpfr-dev \
+            python3 \
+            libboost-dev \
+            libboost-regex-dev \
+            libboost-system-dev \
+            libboost-filesystem-dev \
+            pkgconf \
+            imagemagick \
+            libgl1-mesa-dri \
+            xvfb \
+            libgl-dev \
+            libdouble-conversion-dev
+
+      - name: Prepare source
+        run: |
+          # Copy packaging files to upstream source
+          cp -r packaging/debian upstream/debian
+          cd upstream
+          # Update changelog with git info
+          VERSION=$(date +%Y.%m.%d)
+          COMMIT=$(git rev-parse --short HEAD)
+          sed -i "s/2024.11.18-1/${VERSION}-1/" debian/changelog
+
+      - name: Build Debian package
+        run: |
+          cd upstream
+          dpkg-buildpackage -us -uc -b
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-amd64
+          path: |
+            *.deb
+            *.buildinfo
+            *.changes
+
+  build-debian-arm64:
+    name: Build Debian (arm64)
+    runs-on: [self-hosted, linux, arm64]
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_debian }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            debhelper \
+            devscripts \
+            cmake \
+            qtbase5-dev \
+            libcgal-dev \
+            libopencsg-dev \
+            libqscintilla2-qt5-dev \
+            qtmultimedia5-dev \
+            libfreetype-dev \
+            libfontconfig-dev \
+            libharfbuzz-dev \
+            libeigen3-dev \
+            libglib2.0-dev \
+            libxml2-dev \
+            libzip-dev \
+            libcairo2-dev \
+            lib3mf-dev \
+            libspnav-dev \
+            libqt5gamepad5-dev \
+            bison \
+            flex \
+            libqt5opengl5-dev \
+            libglew-dev \
+            libgmp-dev \
+            libmpfr-dev \
+            python3 \
+            libboost-dev \
+            libboost-regex-dev \
+            libboost-system-dev \
+            libboost-filesystem-dev \
+            pkgconf \
+            imagemagick \
+            libgl1-mesa-dri \
+            xvfb \
+            libgl-dev \
+            libdouble-conversion-dev
+
+      - name: Prepare source
+        run: |
+          cp -r packaging/debian upstream/debian
+          cd upstream
+          VERSION=$(date +%Y.%m.%d)
+          sed -i "s/2024.11.18-1/${VERSION}-1/" debian/changelog
+
+      - name: Build Debian package
+        run: |
+          cd upstream
+          dpkg-buildpackage -us -uc -b
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-arm64
+          path: |
+            *.deb
+            *.buildinfo
+            *.changes
+
+  build-debian-riscv64:
+    name: Build Debian (riscv64)
+    runs-on: [self-hosted, linux, riscv64]
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_debian }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            debhelper \
+            devscripts \
+            cmake \
+            qtbase5-dev \
+            libcgal-dev \
+            libopencsg-dev \
+            libqscintilla2-qt5-dev \
+            qtmultimedia5-dev \
+            libfreetype-dev \
+            libfontconfig-dev \
+            libharfbuzz-dev \
+            libeigen3-dev \
+            libglib2.0-dev \
+            libxml2-dev \
+            libzip-dev \
+            libcairo2-dev \
+            lib3mf-dev \
+            libspnav-dev \
+            libqt5gamepad5-dev \
+            bison \
+            flex \
+            libqt5opengl5-dev \
+            libglew-dev \
+            libgmp-dev \
+            libmpfr-dev \
+            python3 \
+            libboost-dev \
+            libboost-regex-dev \
+            libboost-system-dev \
+            libboost-filesystem-dev \
+            pkgconf \
+            imagemagick \
+            libgl1-mesa-dri \
+            xvfb \
+            libgl-dev \
+            libdouble-conversion-dev
+
+      - name: Prepare source
+        run: |
+          cp -r packaging/debian upstream/debian
+          cd upstream
+          VERSION=$(date +%Y.%m.%d)
+          sed -i "s/2024.11.18-1/${VERSION}-1/" debian/changelog
+
+      - name: Build Debian package
+        run: |
+          cd upstream
+          dpkg-buildpackage -us -uc -b
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-riscv64
+          path: |
+            *.deb
+            *.buildinfo
+            *.changes
+
+  summary:
+    name: Package Build Summary
+    runs-on: ubuntu-latest
+    needs: [build-debian-amd64, build-debian-arm64, build-debian-riscv64]
+    if: always()
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+
+      - name: List packages
+        run: |
+          echo "## Built Packages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          find packages -name "*.deb" -exec basename {} \; | sort | while read pkg; do
+            echo "- $pkg" >> $GITHUB_STEP_SUMMARY
+          done

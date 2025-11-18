@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+
+# export DH_VERBOSE=1
+
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
+# Enable all hardening options
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# Limit parallel builds - OpenSCAD compilation is memory-intensive
+# Each process can use 2-3GB of RAM
+MAX_PARALLEL := $(shell perl -ne '$$p = int($$1/(3*1024**2)) if m/MemTotal:\s+(\d+)\s+kB/; END { if (defined($$p)) { $$p = 1 if $$p < 1; print "--max-parallel=$$p"} }' /proc/meminfo )
+
+%:
+	dh $@ --buildsystem=cmake
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DEXPERIMENTAL=1 \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr
+
+override_dh_auto_build:
+	dh_auto_build $(MAX_PARALLEL)
+
+override_dh_auto_install:
+	dh_auto_install --destdir=debian/openscad
+
+	# Create documentation directory
+	install -d debian/openscad/usr/share/doc/openscad
+
+	# Remove bundled libraries (use system packages instead)
+	rm -rf debian/openscad/usr/share/openscad/libraries
+	rm -rf debian/openscad/usr/share/openscad/fonts
+
+override_dh_auto_test:
+	# Skip tests during package build (run separately in CI)
+	echo "Tests skipped during package build"
+
+override_dh_strip:
+	dh_strip
+
+override_dh_auto_clean:
+	dh_auto_clean
