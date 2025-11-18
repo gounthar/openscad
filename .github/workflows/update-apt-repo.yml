@@ -1,0 +1,274 @@
+name: Update APT Repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Workflow run ID to get packages from (leave empty for latest)'
+        type: string
+        required: false
+  workflow_run:
+    workflows: ["Package from Docker Image"]
+    types:
+      - completed
+    branches:
+      - multiplatform
+
+permissions:
+  contents: write
+
+env:
+  SUITE: stable
+  COMPONENT: main
+  ORIGIN: gounthar
+  LABEL: OpenSCAD Multi-Arch
+  GPG_KEY_ID: '56188341425B007407229B48FB1963FC3575A39D'
+  GPG_PUBLIC_KEY_URL: 'https://github.com/gounthar/docker-for-riscv64/releases/download/gpg-key/gpg-public-key.asc'
+
+jobs:
+  update-repo:
+    name: Update Debian Repository
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: Install APT tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev apt-utils gnupg
+
+      - name: Import GPG key for signing
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Warning: GPG_PRIVATE_KEY secret not set, repository will not be signed"
+            echo "signed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Importing GPG key for package signing..."
+            echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+            gpg --list-secret-keys
+            echo "GPG key imported successfully"
+            echo "signed=true" >> $GITHUB_OUTPUT
+          fi
+        id: gpg
+
+      - name: Determine workflow run ID
+        id: run
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "${{ inputs.run_id }}" ]; then
+              echo "run_id=${{ inputs.run_id }}" >> $GITHUB_OUTPUT
+            else
+              RUN_ID=$(gh run list --workflow=package-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+              echo "run_id=${RUN_ID}" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download packages from workflow
+        run: |
+          mkdir -p downloads
+          echo "Downloading artifacts from run ${{ steps.run.outputs.run_id }}..."
+          gh run download ${{ steps.run.outputs.run_id }} --dir downloads
+          echo "Downloaded packages:"
+          find downloads -name "*.deb" -type f
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Setup repository structure
+        run: |
+          # Create pool directory for all .deb files
+          mkdir -p pool/${{ env.COMPONENT }}
+
+          # Copy all .deb files to pool
+          find downloads -name "*.deb" -exec cp {} pool/${{ env.COMPONENT }}/ \;
+
+          # List packages in pool
+          echo "Packages in pool:"
+          ls -lh pool/${{ env.COMPONENT }}/
+
+      - name: Generate Packages files for each architecture
+        run: |
+          # Get list of architectures from package names
+          ARCHS=$(ls pool/${{ env.COMPONENT }}/*.deb | sed -n 's/.*_\([^_]*\)\.deb$/\1/p' | sort -u)
+
+          echo "Architectures found: $ARCHS"
+
+          for ARCH in $ARCHS; do
+            echo "Processing architecture: $ARCH"
+
+            # Create directory structure
+            DIST_DIR="dists/${{ env.SUITE }}/${{ env.COMPONENT }}/binary-${ARCH}"
+            mkdir -p "${DIST_DIR}"
+
+            # Generate Packages file
+            dpkg-scanpackages --arch ${ARCH} pool/${{ env.COMPONENT }} > "${DIST_DIR}/Packages"
+
+            # Generate compressed versions
+            gzip -k -f "${DIST_DIR}/Packages"
+            xz -k -f "${DIST_DIR}/Packages"
+
+            # Show package count
+            PKG_COUNT=$(grep -c "^Package:" "${DIST_DIR}/Packages" || echo 0)
+            echo "  ${PKG_COUNT} packages for ${ARCH}"
+          done
+
+      - name: Generate Release file
+        run: |
+          DIST_DIR="dists/${{ env.SUITE }}"
+
+          # Get architectures
+          ARCHS=$(ls ${DIST_DIR}/${{ env.COMPONENT }}/ | sed 's/binary-//' | tr '\n' ' ')
+
+          # Create Release file
+          cat > "${DIST_DIR}/Release" << EOF
+          Origin: ${{ env.ORIGIN }}
+          Label: ${{ env.LABEL }}
+          Suite: ${{ env.SUITE }}
+          Codename: ${{ env.SUITE }}
+          Version: $(date +%Y.%m.%d)
+          Architectures: ${ARCHS}
+          Components: ${{ env.COMPONENT }}
+          Description: OpenSCAD packages for multiple architectures
+          Date: $(date -Ru)
+          EOF
+
+          # Add checksums
+          echo "MD5Sum:" >> "${DIST_DIR}/Release"
+          find "${DIST_DIR}/${{ env.COMPONENT }}" -type f | while read file; do
+            SIZE=$(stat -c %s "$file")
+            MD5=$(md5sum "$file" | cut -d' ' -f1)
+            RELPATH=${file#${DIST_DIR}/}
+            printf " %s %16d %s\n" "$MD5" "$SIZE" "$RELPATH" >> "${DIST_DIR}/Release"
+          done
+
+          echo "SHA256:" >> "${DIST_DIR}/Release"
+          find "${DIST_DIR}/${{ env.COMPONENT }}" -type f | while read file; do
+            SIZE=$(stat -c %s "$file")
+            SHA256=$(sha256sum "$file" | cut -d' ' -f1)
+            RELPATH=${file#${DIST_DIR}/}
+            printf " %s %16d %s\n" "$SHA256" "$SIZE" "$RELPATH" >> "${DIST_DIR}/Release"
+          done
+
+          echo "Release file created:"
+          cat "${DIST_DIR}/Release"
+
+      - name: Sign Release file
+        if: steps.gpg.outputs.signed == 'true'
+        run: |
+          DIST_DIR="dists/${{ env.SUITE }}"
+
+          # Create InRelease (clearsigned)
+          gpg --batch --yes --clearsign -o "${DIST_DIR}/InRelease" "${DIST_DIR}/Release"
+
+          # Create Release.gpg (detached signature)
+          gpg --batch --yes --armor --detach-sign -o "${DIST_DIR}/Release.gpg" "${DIST_DIR}/Release"
+
+          echo "Repository signed successfully"
+          ls -la "${DIST_DIR}/"
+
+      - name: Create index page
+        run: |
+          cat > index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>OpenSCAD APT Repository</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+              h1 { color: #333; }
+              pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+              code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; }
+              .warning { background: #fff3cd; border: 1px solid #ffc107; padding: 10px; border-radius: 5px; margin: 10px 0; }
+            </style>
+          </head>
+          <body>
+            <h1>OpenSCAD APT Repository</h1>
+            <p>Multi-architecture Debian packages for OpenSCAD.</p>
+
+            <h2>Supported Architectures</h2>
+            <ul>
+              <li><strong>amd64</strong> (x86_64)</li>
+              <li><strong>arm64</strong> (aarch64)</li>
+              <li><strong>riscv64</strong></li>
+            </ul>
+
+            <h2>Installation</h2>
+
+            <h3>1. Import the GPG key</h3>
+            <pre>curl -fsSL ${{ env.GPG_PUBLIC_KEY_URL }} | sudo gpg --dearmor -o /usr/share/keyrings/openscad-archive-keyring.gpg</pre>
+
+            <h3>2. Add the repository</h3>
+            <pre>echo "deb [signed-by=/usr/share/keyrings/openscad-archive-keyring.gpg] https://gounthar.github.io/openscad stable main" | sudo tee /etc/apt/sources.list.d/openscad.list</pre>
+
+            <h3>3. Update and install</h3>
+            <pre>sudo apt-get update
+          sudo apt-get install openscad</pre>
+
+            <h2>Direct Download</h2>
+            <p>You can also download packages directly from <a href="https://github.com/gounthar/openscad/releases">GitHub Releases</a>.</p>
+
+            <h2>Docker Images</h2>
+            <pre>docker pull ghcr.io/gounthar/openscad:latest</pre>
+
+            <hr>
+            <p><small>Generated by <a href="https://github.com/gounthar/openscad">gounthar/openscad</a></small></p>
+          </body>
+          </html>
+          EOF
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git status
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update APT repository with latest packages"
+            git push origin gh-pages
+          fi
+
+      - name: Summary
+        run: |
+          echo "## APT Repository Updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository URL:** https://gounthar.github.io/openscad" >> $GITHUB_STEP_SUMMARY
+          echo "**GPG Signed:** ${{ steps.gpg.outputs.signed }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Installation" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo '# Import GPG key' >> $GITHUB_STEP_SUMMARY
+          echo 'curl -fsSL ${{ env.GPG_PUBLIC_KEY_URL }} | sudo gpg --dearmor -o /usr/share/keyrings/openscad-archive-keyring.gpg' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '# Add repository' >> $GITHUB_STEP_SUMMARY
+          echo 'echo "deb [signed-by=/usr/share/keyrings/openscad-archive-keyring.gpg] https://gounthar.github.io/openscad stable main" | sudo tee /etc/apt/sources.list.d/openscad.list' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '# Install' >> $GITHUB_STEP_SUMMARY
+          echo 'sudo apt-get update' >> $GITHUB_STEP_SUMMARY
+          echo 'sudo apt-get install openscad' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Packages" >> $GITHUB_STEP_SUMMARY
+          if ls pool/${{ env.COMPONENT }}/*.deb 1>/dev/null 2>&1; then
+            ls pool/${{ env.COMPONENT }}/*.deb | while read pkg; do
+              name=$(basename "$pkg")
+              size=$(du -h "$pkg" | cut -f1)
+              echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
+            done
+          else
+            echo "No packages found" >> $GITHUB_STEP_SUMMARY
+          fi
