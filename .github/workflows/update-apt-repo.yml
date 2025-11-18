@@ -102,6 +102,12 @@ jobs:
           # Get list of architectures from package names
           ARCHS=$(ls pool/${{ env.COMPONENT }}/*.deb | sed -n 's/.*_\([^_]*\)\.deb$/\1/p' | sort -u)
 
+          if [ -z "$ARCHS" ]; then
+            echo "Error: No architectures detected from package filenames. Please ensure .deb files are named in the format 'name_version_arch.deb'." >&2
+            ls -l pool/${{ env.COMPONENT }}/*.deb || true
+            exit 1
+          fi
+
           echo "Architectures found: $ARCHS"
 
           for ARCH in $ARCHS; do
