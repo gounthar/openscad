@@ -84,7 +84,7 @@ rm -rf %{buildroot}%{_datadir}/openscad/fonts
 %{_datadir}/openscad/
 
 %changelog
-* Mon Nov 18 2024 Bruno Verachten <bruno.verachten@gmail.com> - 2024.11.18-1
+* Mon Nov 18 2024 Bruno Verachten <gounthar@gmail.com> - 2024.11.18-1
 - Initial multi-architecture package build
 - Built from upstream commit 63150dbb
 - Supports x86_64, aarch64, and riscv64 architectures
