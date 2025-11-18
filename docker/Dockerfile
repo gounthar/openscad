@@ -28,12 +28,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the upstream OpenSCAD source from submodule
-COPY upstream /openscad
+# Clone the upstream OpenSCAD repository
+# Using specific commit for reproducible builds
+ARG OPENSCAD_COMMIT=63150dbbae53b2c8dbd75143a57409e60c1eb404
+RUN git clone https://github.com/openscad/openscad.git /openscad \
+    && cd /openscad \
+    && git checkout ${OPENSCAD_COMMIT} \
+    && git submodule update --init --recursive
 
-# Install dependencies, initialize submodules, and build OpenSCAD
+# Install dependencies and build OpenSCAD
 RUN cd /openscad \
-    && git submodule update --init --recursive \
     && ./scripts/uni-get-dependencies.sh \
     && ./scripts/check-dependencies.sh \
     && cmake -B build -DEXPERIMENTAL=1 \
