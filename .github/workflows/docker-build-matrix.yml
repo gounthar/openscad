@@ -65,7 +65,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=gha,scope=${{ steps.prep.outputs.cache-key }}
           cache-to: type=gha,mode=max,scope=${{ steps.prep.outputs.cache-key }}
-          outputs: type=image,name=${{ env.DOCKER_HUB_REPO }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.GITHUB_PACKAGES_REPO }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -109,21 +109,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create manifest list and push to Docker Hub
-        working-directory: /tmp/digests
-        run: |
-          docker buildx imagetools create \
-            --tag ${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION }} \
-            $(printf '${{ env.DOCKER_HUB_REPO }}@sha256:%s ' *)
-
       - name: Create manifest list and push to GitHub Packages
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create \
             --tag ${{ env.GITHUB_PACKAGES_REPO }}:${{ env.VERSION }} \
-            $(printf '${{ env.DOCKER_HUB_REPO }}@sha256:%s ' *)
+            $(printf '${{ env.GITHUB_PACKAGES_REPO }}@sha256:%s ' *)
+
+      - name: Create manifest list and push to Docker Hub
+        working-directory: /tmp/digests
+        continue-on-error: true  # Don't fail if Docker Hub has rate limits
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION }} \
+            $(printf '${{ env.GITHUB_PACKAGES_REPO }}@sha256:%s ' *)
 
       - name: Inspect images
         run: |
-          docker buildx imagetools inspect ${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION }}
           docker buildx imagetools inspect ${{ env.GITHUB_PACKAGES_REPO }}:${{ env.VERSION }}
+          docker buildx imagetools inspect ${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION }} || echo "Docker Hub image not available"
