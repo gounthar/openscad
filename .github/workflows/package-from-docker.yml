@@ -26,7 +26,7 @@ on:
       - '.github/workflows/package-from-docker.yml'
 
 env:
-  DOCKER_IMAGE: gounthar/openscad
+  DOCKER_IMAGE: ghcr.io/gounthar/openscad
   PACKAGE_VERSION: 2024.11.18
   PACKAGE_REVISION: 1
 
