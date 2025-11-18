@@ -1,0 +1,379 @@
+name: Package from Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      docker_tag:
+        description: 'Docker image tag to package'
+        type: string
+        default: 'latest'
+  workflow_run:
+    workflows: ["Build and Push Docker Image (Multi-Platform)"]
+    types:
+      - completed
+    branches:
+      - multiplatform
+  # Allow testing from PR branches
+  push:
+    branches:
+      - feature/packaging
+    paths:
+      - '.github/workflows/package-from-docker.yml'
+  pull_request:
+    branches:
+      - multiplatform
+    paths:
+      - '.github/workflows/package-from-docker.yml'
+
+env:
+  DOCKER_IMAGE: gounthar/openscad
+  PACKAGE_VERSION: 2024.11.18
+  PACKAGE_REVISION: 1
+
+jobs:
+  package-amd64:
+    name: Package Debian (amd64)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        run: |
+          # Ensure we can pull the image
+          docker --version
+
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.docker_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pull Docker image
+        run: |
+          docker pull --platform linux/amd64 ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.tag }}
+
+      - name: Extract binaries from Docker image
+        run: |
+          # Create container without starting it
+          CONTAINER_ID=$(docker create --platform linux/amd64 ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.tag }})
+
+          # Create extraction directory
+          mkdir -p extracted/usr/local
+
+          # Copy installed files from container
+          docker cp ${CONTAINER_ID}:/usr/local/bin extracted/usr/local/ || true
+          docker cp ${CONTAINER_ID}:/usr/local/share extracted/usr/local/ || true
+
+          # Clean up container
+          docker rm ${CONTAINER_ID}
+
+          # List extracted files
+          echo "Extracted files:"
+          find extracted -type f | head -50
+
+      - name: Create Debian package structure
+        run: |
+          PKG_NAME="openscad"
+          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_ARCH="amd64"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+
+          mkdir -p ${PKG_DIR}/DEBIAN
+          mkdir -p ${PKG_DIR}/usr/bin
+          mkdir -p ${PKG_DIR}/usr/share
+
+          # Copy binary
+          if [ -f extracted/usr/local/bin/openscad ]; then
+            cp extracted/usr/local/bin/openscad ${PKG_DIR}/usr/bin/
+            chmod 755 ${PKG_DIR}/usr/bin/openscad
+          else
+            echo "ERROR: openscad binary not found!"
+            exit 1
+          fi
+
+          # Copy share files (desktop, icons, etc.)
+          if [ -d extracted/usr/local/share ]; then
+            cp -r extracted/usr/local/share/* ${PKG_DIR}/usr/share/ || true
+          fi
+
+          # Get installed size in KB
+          INSTALLED_SIZE=$(du -sk ${PKG_DIR} | cut -f1)
+
+          # Create control file
+          cat > ${PKG_DIR}/DEBIAN/control << EOF
+          Package: openscad
+          Version: ${PKG_VERSION}-${{ env.PACKAGE_REVISION }}
+          Section: graphics
+          Priority: optional
+          Architecture: ${PKG_ARCH}
+          Installed-Size: ${INSTALLED_SIZE}
+          Maintainer: Bruno Verachten <gounthar@gmail.com>
+          Homepage: https://openscad.org/
+          Description: script file based graphical CAD environment
+           OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
+           aspects rather than artistic ones.
+           .
+           OpenSCAD is not an interactive modeller. Instead it is something like a
+           3D-compiler that reads in a script file that describes the object and renders
+           the 3D model from this script. This gives the designer full control over the
+           modelling process and enables him to easily change any step in the modelling
+           process or make designs that are defined by configurable parameters.
+           .
+           This package was built from Docker image for amd64 architecture.
+          EOF
+
+          # Fix control file formatting (remove leading spaces)
+          sed -i 's/^          //' ${PKG_DIR}/DEBIAN/control
+
+      - name: Build Debian package
+        run: |
+          PKG_NAME="openscad"
+          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_ARCH="amd64"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+
+          # Build the package
+          dpkg-deb --build ${PKG_DIR}
+
+          # Verify the package
+          dpkg-deb --info ${PKG_DIR}.deb
+
+          # List package contents
+          dpkg-deb --contents ${PKG_DIR}.deb | head -30
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-amd64-docker
+          path: "*.deb"
+
+  package-arm64:
+    name: Package Debian (arm64)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.docker_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pull Docker image
+        run: |
+          docker pull --platform linux/arm64 ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.tag }}
+
+      - name: Extract binaries from Docker image
+        run: |
+          CONTAINER_ID=$(docker create --platform linux/arm64 ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.tag }})
+          mkdir -p extracted/usr/local
+          docker cp ${CONTAINER_ID}:/usr/local/bin extracted/usr/local/ || true
+          docker cp ${CONTAINER_ID}:/usr/local/share extracted/usr/local/ || true
+          docker rm ${CONTAINER_ID}
+          echo "Extracted files:"
+          find extracted -type f | head -50
+
+      - name: Create Debian package structure
+        run: |
+          PKG_NAME="openscad"
+          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_ARCH="arm64"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+
+          mkdir -p ${PKG_DIR}/DEBIAN
+          mkdir -p ${PKG_DIR}/usr/bin
+          mkdir -p ${PKG_DIR}/usr/share
+
+          if [ -f extracted/usr/local/bin/openscad ]; then
+            cp extracted/usr/local/bin/openscad ${PKG_DIR}/usr/bin/
+            chmod 755 ${PKG_DIR}/usr/bin/openscad
+          else
+            echo "ERROR: openscad binary not found!"
+            exit 1
+          fi
+
+          if [ -d extracted/usr/local/share ]; then
+            cp -r extracted/usr/local/share/* ${PKG_DIR}/usr/share/ || true
+          fi
+
+          INSTALLED_SIZE=$(du -sk ${PKG_DIR} | cut -f1)
+
+          cat > ${PKG_DIR}/DEBIAN/control << EOF
+          Package: openscad
+          Version: ${PKG_VERSION}-${{ env.PACKAGE_REVISION }}
+          Section: graphics
+          Priority: optional
+          Architecture: ${PKG_ARCH}
+          Installed-Size: ${INSTALLED_SIZE}
+          Maintainer: Bruno Verachten <gounthar@gmail.com>
+          Homepage: https://openscad.org/
+          Description: script file based graphical CAD environment
+           OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
+           aspects rather than artistic ones.
+           .
+           OpenSCAD is not an interactive modeller. Instead it is something like a
+           3D-compiler that reads in a script file that describes the object and renders
+           the 3D model from this script. This gives the designer full control over the
+           modelling process and enables him to easily change any step in the modelling
+           process or make designs that are defined by configurable parameters.
+           .
+           This package was built from Docker image for arm64 architecture.
+          EOF
+
+          sed -i 's/^          //' ${PKG_DIR}/DEBIAN/control
+
+      - name: Build Debian package
+        run: |
+          PKG_NAME="openscad"
+          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_ARCH="arm64"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+
+          dpkg-deb --build ${PKG_DIR}
+          dpkg-deb --info ${PKG_DIR}.deb
+          dpkg-deb --contents ${PKG_DIR}.deb | head -30
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-arm64-docker
+          path: "*.deb"
+
+  package-riscv64:
+    name: Package Debian (riscv64)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.docker_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pull Docker image
+        run: |
+          docker pull --platform linux/riscv64 ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.tag }}
+
+      - name: Extract binaries from Docker image
+        run: |
+          CONTAINER_ID=$(docker create --platform linux/riscv64 ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.tag }})
+          mkdir -p extracted/usr/local
+          docker cp ${CONTAINER_ID}:/usr/local/bin extracted/usr/local/ || true
+          docker cp ${CONTAINER_ID}:/usr/local/share extracted/usr/local/ || true
+          docker rm ${CONTAINER_ID}
+          echo "Extracted files:"
+          find extracted -type f | head -50
+
+      - name: Create Debian package structure
+        run: |
+          PKG_NAME="openscad"
+          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_ARCH="riscv64"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+
+          mkdir -p ${PKG_DIR}/DEBIAN
+          mkdir -p ${PKG_DIR}/usr/bin
+          mkdir -p ${PKG_DIR}/usr/share
+
+          if [ -f extracted/usr/local/bin/openscad ]; then
+            cp extracted/usr/local/bin/openscad ${PKG_DIR}/usr/bin/
+            chmod 755 ${PKG_DIR}/usr/bin/openscad
+          else
+            echo "ERROR: openscad binary not found!"
+            exit 1
+          fi
+
+          if [ -d extracted/usr/local/share ]; then
+            cp -r extracted/usr/local/share/* ${PKG_DIR}/usr/share/ || true
+          fi
+
+          INSTALLED_SIZE=$(du -sk ${PKG_DIR} | cut -f1)
+
+          cat > ${PKG_DIR}/DEBIAN/control << EOF
+          Package: openscad
+          Version: ${PKG_VERSION}-${{ env.PACKAGE_REVISION }}
+          Section: graphics
+          Priority: optional
+          Architecture: ${PKG_ARCH}
+          Installed-Size: ${INSTALLED_SIZE}
+          Maintainer: Bruno Verachten <gounthar@gmail.com>
+          Homepage: https://openscad.org/
+          Description: script file based graphical CAD environment
+           OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
+           aspects rather than artistic ones.
+           .
+           OpenSCAD is not an interactive modeller. Instead it is something like a
+           3D-compiler that reads in a script file that describes the object and renders
+           the 3D model from this script. This gives the designer full control over the
+           modelling process and enables him to easily change any step in the modelling
+           process or make designs that are defined by configurable parameters.
+           .
+           This package was built from Docker image for riscv64 architecture.
+          EOF
+
+          sed -i 's/^          //' ${PKG_DIR}/DEBIAN/control
+
+      - name: Build Debian package
+        run: |
+          PKG_NAME="openscad"
+          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_ARCH="riscv64"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+
+          dpkg-deb --build ${PKG_DIR}
+          dpkg-deb --info ${PKG_DIR}.deb
+          dpkg-deb --contents ${PKG_DIR}.deb | head -30
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-riscv64-docker
+          path: "*.deb"
+
+  summary:
+    name: Package Summary
+    runs-on: ubuntu-latest
+    needs: [package-amd64, package-arm64, package-riscv64]
+    if: always()
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+
+      - name: List packages
+        run: |
+          echo "## Built Packages from Docker" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Packages extracted from Docker image and repackaged as .deb:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          find packages -name "*.deb" -exec basename {} \; | sort | while read pkg; do
+            size=$(find packages -name "$pkg" -exec du -h {} \; | cut -f1)
+            echo "- **$pkg** ($size)" >> $GITHUB_STEP_SUMMARY
+          done
