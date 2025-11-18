@@ -7,10 +7,11 @@ on:
         description: 'Build Debian packages'
         type: boolean
         default: true
-      build_rpm:
-        description: 'Build RPM packages'
-        type: boolean
-        default: false
+      # RPM build jobs are not yet implemented
+      # build_rpm:
+      #   description: 'Build RPM packages'
+      #   type: boolean
+      #   default: false
   push:
     branches:
       - multiplatform
@@ -64,11 +65,11 @@ jobs:
             bison \
             flex \
             libqt5opengl5-dev \
+            libqt5svg5-dev \
             libglew-dev \
             libgmp-dev \
             libmpfr-dev \
             python3 \
-            libboost-dev \
             libboost-regex-dev \
             libboost-system-dev \
             libboost-filesystem-dev \
@@ -86,7 +87,6 @@ jobs:
           cd upstream
           # Update changelog with git info
           VERSION=$(date +%Y.%m.%d)
-          COMMIT=$(git rev-parse --short HEAD)
           sed -i "s/2024.11.18-1/${VERSION}-1/" debian/changelog
 
       - name: Build Debian package
@@ -99,9 +99,9 @@ jobs:
         with:
           name: debian-amd64
           path: |
-            *.deb
-            *.buildinfo
-            *.changes
+            ../*.deb
+            ../*.buildinfo
+            ../*.changes
 
   build-debian-arm64:
     name: Build Debian (arm64)
@@ -142,11 +142,11 @@ jobs:
             bison \
             flex \
             libqt5opengl5-dev \
+            libqt5svg5-dev \
             libglew-dev \
             libgmp-dev \
             libmpfr-dev \
             python3 \
-            libboost-dev \
             libboost-regex-dev \
             libboost-system-dev \
             libboost-filesystem-dev \
@@ -174,9 +174,9 @@ jobs:
         with:
           name: debian-arm64
           path: |
-            *.deb
-            *.buildinfo
-            *.changes
+            ../*.deb
+            ../*.buildinfo
+            ../*.changes
 
   build-debian-riscv64:
     name: Build Debian (riscv64)
@@ -217,11 +217,11 @@ jobs:
             bison \
             flex \
             libqt5opengl5-dev \
+            libqt5svg5-dev \
             libglew-dev \
             libgmp-dev \
             libmpfr-dev \
             python3 \
-            libboost-dev \
             libboost-regex-dev \
             libboost-system-dev \
             libboost-filesystem-dev \
@@ -249,9 +249,9 @@ jobs:
         with:
           name: debian-riscv64
           path: |
-            *.deb
-            *.buildinfo
-            *.changes
+            ../*.deb
+            ../*.buildinfo
+            ../*.changes
 
   summary:
     name: Package Build Summary

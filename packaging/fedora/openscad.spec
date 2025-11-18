@@ -1,7 +1,7 @@
 Name:           openscad
 Version:        2024.11.18
 Release:        1%{?dist}
-Summary:        The Programmers Solid 3D CAD Modeller
+Summary:        The Programmer's Solid 3D CAD Modeller
 
 # Upstream commit for this build
 %global commit 63150dbbae53b2c8dbd75143a57409e60c1eb404
@@ -29,6 +29,7 @@ BuildRequires:  cairo-devel
 BuildRequires:  lib3mf-devel
 BuildRequires:  libspnav-devel
 BuildRequires:  qt5-qtgamepad-devel
+BuildRequires:  qt5-qtsvg-devel
 BuildRequires:  bison >= 2.4
 BuildRequires:  flex >= 2.5.35
 BuildRequires:  glew-devel >= 1.5.4
