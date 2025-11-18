@@ -13,6 +13,17 @@ on:
       - completed
     branches:
       - multiplatform
+  # Allow testing from PR branches
+  push:
+    branches:
+      - feature/packaging
+    paths:
+      - '.github/workflows/package-from-docker.yml'
+  pull_request:
+    branches:
+      - multiplatform
+    paths:
+      - '.github/workflows/package-from-docker.yml'
 
 env:
   DOCKER_IMAGE: gounthar/openscad
