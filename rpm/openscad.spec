@@ -64,8 +64,13 @@ install -p -m 0755 %{_sourcedir}/openscad %{buildroot}%{_bindir}/openscad
 
 # Install data files if present
 if [ -d %{_sourcedir}/share ]; then
-    # Copy all data files with attributes preserved
-    cp -a %{_sourcedir}/share/. %{buildroot}%{_datadir}/
+    # Copy specific data files
+    cp -a %{_sourcedir}/share/applications %{buildroot}%{_datadir}/ 2>/dev/null || true
+    cp -a %{_sourcedir}/share/icons %{buildroot}%{_datadir}/ 2>/dev/null || true
+    cp -a %{_sourcedir}/share/metainfo %{buildroot}%{_datadir}/ 2>/dev/null || true
+    cp -a %{_sourcedir}/share/mime %{buildroot}%{_datadir}/ 2>/dev/null || true
+    # Create openscad directory (ownership claimed by package)
+    # Do not copy any library files from Docker image
 fi
 
 %files
