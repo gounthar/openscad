@@ -136,7 +136,8 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             PRERELEASE="${{ inputs.prerelease }}"
           else
-            PRERELEASE="true"
+            # Automatic triggers create full releases by default
+            PRERELEASE="false"
           fi
 
           # Build release notes
