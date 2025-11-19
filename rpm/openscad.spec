@@ -58,15 +58,9 @@ install -d %{buildroot}%{_datadir}/icons/hicolor/scalable/apps
 install -d %{buildroot}%{_datadir}/metainfo
 install -d %{buildroot}%{_datadir}/mime/packages
 install -d %{buildroot}%{_datadir}/openscad
-install -d %{buildroot}%{_datadir}/licenses/openscad
-install -d %{buildroot}%{_datadir}/doc/openscad
 
 # Install binary
 install -p -m 0755 %{_sourcedir}/openscad %{buildroot}%{_bindir}/openscad
-
-# Install license and documentation
-install -p -m 0644 %{_sourcedir}/COPYING %{buildroot}%{_datadir}/licenses/openscad/COPYING
-install -p -m 0644 %{_sourcedir}/README.md %{buildroot}%{_datadir}/doc/openscad/README.md
 
 # Install data files if present
 if [ -d %{_sourcedir}/share ]; then
@@ -75,8 +69,8 @@ if [ -d %{_sourcedir}/share ]; then
 fi
 
 %files
-%license %{_datadir}/licenses/openscad/COPYING
-%doc %{_datadir}/doc/openscad/README.md
+%license COPYING
+%doc README.md
 %{_bindir}/openscad
 %{_datadir}/applications/openscad.desktop
 %{_datadir}/icons/hicolor/*/apps/openscad.*

@@ -11,7 +11,6 @@ on:
 
 env:
   DOCKER_IMAGE: ghcr.io/gounthar/openscad
-  PACKAGE_REVISION: 1
 
 jobs:
   package-rpm:
@@ -43,7 +42,7 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          VERSION=$(date +%Y.%m.%d)
+          VERSION=$(date +%Y.%m.%d).${GITHUB_RUN_NUMBER}
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Package version: ${VERSION}"
 
@@ -71,7 +70,7 @@ jobs:
 
           mkdir -p extract
           docker cp ${CONTAINER_ID}:/usr/local/bin/openscad extract/openscad
-          docker cp ${CONTAINER_ID}:/usr/local/share extract/share 2>/dev/null || echo "No share directory found, continuing..."
+          docker cp ${CONTAINER_ID}:/usr/local/share extract/share 2>&1 || echo "Warning: Could not extract share directory"
 
           docker rm ${CONTAINER_ID}
 
@@ -89,12 +88,12 @@ jobs:
           CONTAINER_ID=$(docker create --platform ${{ matrix.platform }} ${{ env.DOCKER_IMAGE }}:latest)
 
           # Try to extract license and docs from common locations
-          docker cp ${CONTAINER_ID}:/usr/local/share/doc/openscad/COPYING extract/COPYING 2>/dev/null || \
-          docker cp ${CONTAINER_ID}:/usr/share/doc/openscad/COPYING extract/COPYING 2>/dev/null || \
+          docker cp ${CONTAINER_ID}:/usr/local/share/doc/openscad/COPYING extract/COPYING 2>&1 || \
+          docker cp ${CONTAINER_ID}:/usr/share/doc/openscad/COPYING extract/COPYING 2>&1 || \
           echo "COPYING not found in container"
 
-          docker cp ${CONTAINER_ID}:/usr/local/share/doc/openscad/README.md extract/README.md 2>/dev/null || \
-          docker cp ${CONTAINER_ID}:/usr/share/doc/openscad/README.md extract/README.md 2>/dev/null || \
+          docker cp ${CONTAINER_ID}:/usr/local/share/doc/openscad/README.md extract/README.md 2>&1 || \
+          docker cp ${CONTAINER_ID}:/usr/share/doc/openscad/README.md extract/README.md 2>&1 || \
           echo "README.md not found in container"
 
           docker rm ${CONTAINER_ID}
@@ -115,7 +114,7 @@ jobs:
           cp extract/openscad ~/rpmbuild/SOURCES/
           cp extract/COPYING ~/rpmbuild/SOURCES/
           cp extract/README.md ~/rpmbuild/SOURCES/
-          cp -r extract/share ~/rpmbuild/SOURCES/ 2>/dev/null || true
+          cp -r extract/share ~/rpmbuild/SOURCES/ 2>&1 || true
 
           # Copy spec file
           cp rpm/openscad.spec ~/rpmbuild/SPECS/
