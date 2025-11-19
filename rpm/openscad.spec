@@ -9,8 +9,6 @@ URL:            https://openscad.org/
 # Pre-built binary package - no source required
 # Binaries extracted from Docker image
 
-BuildRequires:  coreutils
-
 # Runtime dependencies for Fedora
 Requires:       qt5-qtbase
 Requires:       qt5-qtmultimedia
@@ -66,20 +64,17 @@ install -p -m 0755 %{_sourcedir}/openscad %{buildroot}%{_bindir}/openscad
 
 # Install data files if present
 if [ -d %{_sourcedir}/share ]; then
-    cp -r %{_sourcedir}/share/applications/* %{buildroot}%{_datadir}/applications/ 2>/dev/null || true
-    cp -r %{_sourcedir}/share/icons/* %{buildroot}%{_datadir}/icons/ 2>/dev/null || true
-    cp -r %{_sourcedir}/share/metainfo/* %{buildroot}%{_datadir}/metainfo/ 2>/dev/null || true
-    cp -r %{_sourcedir}/share/mime/* %{buildroot}%{_datadir}/mime/ 2>/dev/null || true
-    cp -r %{_sourcedir}/share/openscad/* %{buildroot}%{_datadir}/openscad/ 2>/dev/null || true
+    # Copy all data files with attributes preserved
+    cp -a %{_sourcedir}/share/. %{buildroot}%{_datadir}/
 fi
 
 %files
 %{_bindir}/openscad
-%{_datadir}/applications/*.desktop
+%{_datadir}/applications/openscad.desktop
 %{_datadir}/icons/hicolor/*/apps/openscad.*
-%{_datadir}/metainfo/*.xml
-%{_datadir}/mime/packages/*.xml
-%{_datadir}/openscad/
+%{_datadir}/metainfo/org.openscad.OpenSCAD.appdata.xml
+%{_datadir}/mime/packages/openscad.xml
+%dir %{_datadir}/openscad/
 
 %changelog
 * Wed Nov 19 2025 Bruno Verachten <gounthar@gmail.com> - 2025.11.19-1
