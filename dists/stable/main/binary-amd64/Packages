@@ -1,0 +1,25 @@
+Package: openscad
+Version: 2024.11.18-1
+Architecture: amd64
+Maintainer: Bruno Verachten <gounthar@gmail.com>
+Installed-Size: 71096
+Filename: pool/main/openscad_2024.11.18-1_amd64.deb
+Size: 10954372
+MD5sum: 283bb628bcb8910196339f7fe86d3be2
+SHA1: d6fd5e5139aa94efc56414bfb05313dbdd6f93de
+SHA256: e7931049a2acde9c839c3c66a3030aea1c96264f197eec2927b0d9a8f0abd9f8
+Section: graphics
+Priority: optional
+Homepage: https://openscad.org/
+Description: script file based graphical CAD environment
+ OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
+ aspects rather than artistic ones.
+ .
+ OpenSCAD is not an interactive modeller. Instead it is something like a
+ 3D-compiler that reads in a script file that describes the object and renders
+ the 3D model from this script. This gives the designer full control over the
+ modelling process and enables him to easily change any step in the modelling
+ process or make designs that are defined by configurable parameters.
+ .
+ This package was built from Docker image for amd64 architecture.
+
