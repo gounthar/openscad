@@ -39,7 +39,7 @@ aspects rather than artistic ones.
 OpenSCAD is not an interactive modeller. Instead it is something like a
 3D-compiler that reads in a script file that describes the object and renders
 the 3D model from this script. This gives the designer full control over the
-modelling process and enables him to easily change any step in the modelling
+modelling process and enables the designer to easily change any step in the modelling
 process or make designs that are defined by configurable parameters.
 
 This package contains pre-built binaries extracted from Docker images.

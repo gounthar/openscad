@@ -83,7 +83,7 @@ jobs:
 
           # List downloaded files
           echo "Downloaded packages:"
-          find packages -name "*.deb" -o -name "*.rpm" -type f
+          find packages \( -name "*.deb" -o -name "*.rpm" \) -type f
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -174,7 +174,8 @@ jobs:
           ### Fedora/RHEL Installation
           ```bash
           # Download the appropriate .rpm for your architecture
-          sudo dnf install openscad-${{ steps.version.outputs.version }}-1.<arch>.rpm
+          # Replace <arch> with one of: x86_64, aarch64, or riscv64
+          sudo dnf install openscad-${{ steps.version.outputs.version }}-1*.rpm
           ```
 
           ### Docker Images
@@ -190,12 +191,12 @@ jobs:
           EOF
 
           # Create release with assets (both .deb and .rpm)
-          ASSETS=""
+          ASSETS=()
           if ls release-assets/*.deb 1>/dev/null 2>&1; then
-            ASSETS="$ASSETS release-assets/*.deb"
+            ASSETS+=(release-assets/*.deb)
           fi
           if ls release-assets/*.rpm 1>/dev/null 2>&1; then
-            ASSETS="$ASSETS release-assets/*.rpm"
+            ASSETS+=(release-assets/*.rpm)
           fi
 
           if [ "${PRERELEASE}" = "true" ]; then
@@ -203,12 +204,12 @@ jobs:
               --title "OpenSCAD ${{ steps.version.outputs.version }}" \
               --notes-file release-notes.md \
               --prerelease \
-              $ASSETS
+              "${ASSETS[@]}"
           else
             gh release create "${{ steps.version.outputs.tag }}" \
               --title "OpenSCAD ${{ steps.version.outputs.version }}" \
               --notes-file release-notes.md \
-              $ASSETS
+              "${ASSETS[@]}"
           fi
 
           echo "Release created: ${{ steps.version.outputs.tag }}"
