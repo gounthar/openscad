@@ -16,7 +16,7 @@ on:
         type: string
         required: false
   workflow_run:
-    workflows: ["Package from Docker Image"]
+    workflows: ["Package from Docker Image", "Package RPM from Docker Image"]
     types:
       - completed
     branches:
@@ -83,7 +83,7 @@ jobs:
 
           # List downloaded files
           echo "Downloaded packages:"
-          find packages -name "*.deb" -type f
+          find packages -name "*.deb" -o -name "*.rpm" -type f
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -93,21 +93,30 @@ jobs:
         run: |
           mkdir -p release-assets
 
-          # Move all .deb files to release-assets with flat structure
+          # Move all .deb and .rpm files to release-assets with flat structure
           find packages -name "*.deb" -exec cp {} release-assets/ \;
+          find packages -name "*.rpm" -exec cp {} release-assets/ \;
 
           # List assets
           echo "Release assets:"
           ls -lh release-assets/
 
           # Count packages
+          DEB_COUNT=0
+          RPM_COUNT=0
           if ls release-assets/*.deb 1>/dev/null 2>&1; then
-            COUNT=$(ls release-assets/*.deb | wc -l)
-          else
-            COUNT=0
-            echo "Warning: No .deb files found in release-assets"
+            DEB_COUNT=$(ls release-assets/*.deb | wc -l)
+          fi
+          if ls release-assets/*.rpm 1>/dev/null 2>&1; then
+            RPM_COUNT=$(ls release-assets/*.rpm | wc -l)
+          fi
+          COUNT=$((DEB_COUNT + RPM_COUNT))
+          if [ "$COUNT" -eq 0 ]; then
+            echo "Warning: No packages found in release-assets"
           fi
           echo "count=${COUNT}" >> $GITHUB_OUTPUT
+          echo "deb_count=${DEB_COUNT}" >> $GITHUB_OUTPUT
+          echo "rpm_count=${RPM_COUNT}" >> $GITHUB_OUTPUT
 
       - name: Check if release already exists
         if: steps.check_artifacts.outputs.has_artifacts == 'true'
@@ -153,12 +162,19 @@ jobs:
 
           ### Installation
 
+          ### Debian/Ubuntu Installation
           ```bash
           # Download the appropriate .deb for your architecture
           sudo dpkg -i openscad_${{ steps.version.outputs.version }}-1_<arch>.deb
 
           # Install any missing dependencies
           sudo apt-get install -f
+          ```
+
+          ### Fedora/RHEL Installation
+          ```bash
+          # Download the appropriate .rpm for your architecture
+          sudo dnf install openscad-${{ steps.version.outputs.version }}-1.<arch>.rpm
           ```
 
           ### Docker Images
@@ -173,18 +189,26 @@ jobs:
           - Workflow run: ${{ steps.run.outputs.run_id }}
           EOF
 
-          # Create release with assets
+          # Create release with assets (both .deb and .rpm)
+          ASSETS=""
+          if ls release-assets/*.deb 1>/dev/null 2>&1; then
+            ASSETS="$ASSETS release-assets/*.deb"
+          fi
+          if ls release-assets/*.rpm 1>/dev/null 2>&1; then
+            ASSETS="$ASSETS release-assets/*.rpm"
+          fi
+
           if [ "${PRERELEASE}" = "true" ]; then
             gh release create "${{ steps.version.outputs.tag }}" \
               --title "OpenSCAD ${{ steps.version.outputs.version }}" \
               --notes-file release-notes.md \
               --prerelease \
-              release-assets/*.deb
+              $ASSETS
           else
             gh release create "${{ steps.version.outputs.tag }}" \
               --title "OpenSCAD ${{ steps.version.outputs.version }}" \
               --notes-file release-notes.md \
-              release-assets/*.deb
+              $ASSETS
           fi
 
           echo "Release created: ${{ steps.version.outputs.tag }}"
@@ -202,11 +226,21 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Assets" >> $GITHUB_STEP_SUMMARY
           if ls release-assets/*.deb 1>/dev/null 2>&1; then
+            echo "#### Debian Packages" >> $GITHUB_STEP_SUMMARY
             ls release-assets/*.deb | while read pkg; do
               name=$(basename "$pkg")
               size=$(du -h "$pkg" | cut -f1)
               echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
             done
-          else
+          fi
+          if ls release-assets/*.rpm 1>/dev/null 2>&1; then
+            echo "#### RPM Packages" >> $GITHUB_STEP_SUMMARY
+            ls release-assets/*.rpm | while read pkg; do
+              name=$(basename "$pkg")
+              size=$(du -h "$pkg" | cut -f1)
+              echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+          if [ "${{ steps.assets.outputs.count }}" = "0" ]; then
             echo "No packages found" >> $GITHUB_STEP_SUMMARY
           fi
