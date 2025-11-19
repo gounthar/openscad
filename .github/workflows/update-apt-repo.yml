@@ -32,32 +32,8 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: Checkout gh-pages branch
+      - name: Checkout repository for composite action
         uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          fetch-depth: 0
-
-      - name: Install APT tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y dpkg-dev apt-utils gnupg
-
-      - name: Import GPG key for signing
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-        run: |
-          if [ -z "$GPG_PRIVATE_KEY" ]; then
-            echo "Warning: GPG_PRIVATE_KEY secret not set, repository will not be signed"
-            echo "signed=false" >> $GITHUB_OUTPUT
-          else
-            echo "Importing GPG key for package signing..."
-            echo "$GPG_PRIVATE_KEY" | gpg --batch --import
-            gpg --list-secret-keys
-            echo "GPG key imported successfully"
-            echo "signed=true" >> $GITHUB_OUTPUT
-          fi
-        id: gpg
 
       - name: Determine workflow run ID
         id: run
@@ -81,6 +57,36 @@ jobs:
         with:
           run_id: ${{ steps.run.outputs.run_id }}
           github_token: ${{ github.token }}
+
+      - name: Checkout gh-pages branch
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: Install APT tools
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev apt-utils gnupg
+
+      - name: Import GPG key for signing
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Warning: GPG_PRIVATE_KEY secret not set, repository will not be signed"
+            echo "signed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Importing GPG key for package signing..."
+            echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+            gpg --list-secret-keys
+            echo "GPG key imported successfully"
+            echo "signed=true" >> $GITHUB_OUTPUT
+          fi
+        id: gpg
 
       - name: Download packages from workflow
         if: steps.check_artifacts.outputs.has_artifacts == 'true'
