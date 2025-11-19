@@ -98,12 +98,16 @@ jobs:
 
           docker rm ${CONTAINER_ID}
 
-          # Create placeholder files if not found
+          # Fail the build if license or documentation files are missing
           if [ ! -f extract/COPYING ]; then
-            echo "See https://github.com/openscad/openscad/blob/master/COPYING" > extract/COPYING
+            echo "Error: COPYING file not found in Docker image"
+            echo "The license file is required for RPM packaging and GPL compliance"
+            exit 1
           fi
           if [ ! -f extract/README.md ]; then
-            echo "See https://github.com/openscad/openscad" > extract/README.md
+            echo "Error: README.md file not found in Docker image"
+            echo "Documentation is required for proper RPM packaging"
+            exit 1
           fi
 
       - name: Set up RPM build tree
