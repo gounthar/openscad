@@ -64,7 +64,34 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+      - name: Check if run has artifacts
+        id: check_artifacts
+        run: |
+          RUN_ID="${{ steps.run.outputs.run_id }}"
+          echo "Checking artifacts for run ${RUN_ID}..."
+
+          ARTIFACT_COUNT=$(gh api repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts --jq '.total_count')
+          echo "Found ${ARTIFACT_COUNT} artifacts"
+
+          if [ "${ARTIFACT_COUNT}" = "0" ]; then
+            echo "No artifacts found in run ${RUN_ID}. Skipping release creation."
+            echo "has_artifacts=false" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "has_artifacts=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Skip if no artifacts
+        if: steps.check_artifacts.outputs.has_artifacts == 'false'
+        run: |
+          echo "::notice::Skipping release creation - no artifacts found in packaging run"
+          echo "## Skipped" >> $GITHUB_STEP_SUMMARY
+          echo "No artifacts found in packaging workflow run. This usually means all packaging jobs were skipped." >> $GITHUB_STEP_SUMMARY
+
       - name: Download artifacts from packaging workflow
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
         run: |
           mkdir -p packages
 
@@ -80,6 +107,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Prepare release assets
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
         id: assets
         run: |
           mkdir -p release-assets
@@ -101,6 +129,7 @@ jobs:
           echo "count=${COUNT}" >> $GITHUB_OUTPUT
 
       - name: Check if release already exists
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
         id: check
         run: |
           if gh release view "${{ steps.version.outputs.tag }}" &>/dev/null; then
@@ -112,7 +141,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Delete existing release if needed
-        if: steps.check.outputs.exists == 'true'
+        if: steps.check_artifacts.outputs.has_artifacts == 'true' && steps.check.outputs.exists == 'true'
         run: |
           echo "Deleting existing release ${{ steps.version.outputs.tag }}..."
           gh release delete "${{ steps.version.outputs.tag }}" --yes --cleanup-tag
@@ -120,6 +149,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create GitHub Release
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
         run: |
           # Determine if prerelease
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -180,6 +210,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Summary
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
         run: |
           echo "## Release Created" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
