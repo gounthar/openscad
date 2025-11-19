@@ -81,7 +81,13 @@ jobs:
           RUN_ID="${{ steps.run.outputs.run_id }}"
           echo "Checking artifacts for run ${RUN_ID}..."
 
-          ARTIFACT_COUNT=$(gh api repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts --jq '.total_count')
+          ARTIFACT_COUNT=$(gh api repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts --jq '.total_count' 2>/dev/null || echo "")
+
+          if [ -z "${ARTIFACT_COUNT}" ]; then
+            echo "Error: Failed to retrieve artifact count for run ${RUN_ID}"
+            exit 1
+          fi
+
           echo "Found ${ARTIFACT_COUNT} artifacts"
 
           if [ "${ARTIFACT_COUNT}" = "0" ]; then
