@@ -98,12 +98,24 @@ jobs:
 
           docker rm ${CONTAINER_ID}
 
-          # Create placeholder files if not found
+          # Fallback to repo files or placeholder if not found in container
           if [ ! -f extract/COPYING ]; then
-            echo "See https://github.com/openscad/openscad/blob/master/COPYING" > extract/COPYING
+            if [ -f COPYING ]; then
+              cp COPYING extract/COPYING
+              echo "Using COPYING from repository"
+            else
+              echo "See https://github.com/openscad/openscad/blob/master/COPYING" > extract/COPYING
+              echo "Warning: COPYING not found, using placeholder"
+            fi
           fi
           if [ ! -f extract/README.md ]; then
-            echo "See https://github.com/openscad/openscad" > extract/README.md
+            if [ -f README.md ]; then
+              cp README.md extract/README.md
+              echo "Using README.md from repository"
+            else
+              echo "See https://github.com/openscad/openscad" > extract/README.md
+              echo "Warning: README.md not found, using placeholder"
+            fi
           fi
 
       - name: Set up RPM build tree
