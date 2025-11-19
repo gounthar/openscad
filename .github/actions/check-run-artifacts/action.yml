@@ -24,21 +24,22 @@ runs:
       id: check
       shell: bash
       run: |
-        RUN_ID="${{ inputs.run_id }}"
-        echo "Checking artifacts for run ${RUN_ID}..."
+        set -eo pipefail
 
-        ARTIFACT_COUNT=$(gh api repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts --jq '.total_count' 2>/dev/null || echo "")
+        echo "Checking artifacts for run ${{ inputs.run_id }}..."
 
-        if [ -z "${ARTIFACT_COUNT}" ]; then
-          echo "Error: Failed to retrieve artifact count for run ${RUN_ID}"
+        ARTIFACT_COUNT=$(gh api repos/${{ github.repository }}/actions/runs/${{ inputs.run_id }}/artifacts --jq '.total_count')
+
+        if [[ "${ARTIFACT_COUNT}" == "null" ]]; then
+          echo "Error: Failed to retrieve a valid artifact count from API response for run ${{ inputs.run_id }}." >&2
           exit 1
         fi
 
         echo "Found ${ARTIFACT_COUNT} artifacts"
         echo "artifact_count=${ARTIFACT_COUNT}" >> $GITHUB_OUTPUT
 
-        if [ "${ARTIFACT_COUNT}" = "0" ]; then
-          echo "No artifacts found in run ${RUN_ID}."
+        if [ "${ARTIFACT_COUNT}" -eq 0 ]; then
+          echo "No artifacts found in run ${{ inputs.run_id }}."
           echo "has_artifacts=false" >> $GITHUB_OUTPUT
         else
           echo "has_artifacts=true" >> $GITHUB_OUTPUT
@@ -50,6 +51,6 @@ runs:
       if: steps.check.outputs.has_artifacts == 'false'
       shell: bash
       run: |
-        echo "::notice::No artifacts found in packaging run ${{ inputs.run_id }}"
+        echo "::notice::No artifacts found in workflow run ${{ inputs.run_id }}"
         echo "## Skipped" >> $GITHUB_STEP_SUMMARY
-        echo "No artifacts found in packaging workflow run. This usually means all packaging jobs were skipped." >> $GITHUB_STEP_SUMMARY
+        echo "No artifacts found in workflow run ${{ inputs.run_id }}. Subsequent steps may be skipped." >> $GITHUB_STEP_SUMMARY
