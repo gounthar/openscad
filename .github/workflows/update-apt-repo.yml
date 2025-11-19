@@ -91,6 +91,7 @@ jobs:
       - name: Download packages from workflow
         if: steps.check_artifacts.outputs.has_artifacts == 'true'
         run: |
+          rm -rf downloads
           mkdir -p downloads
           echo "Downloading artifacts from run ${{ steps.run.outputs.run_id }}..."
           gh run download ${{ steps.run.outputs.run_id }} --dir downloads
