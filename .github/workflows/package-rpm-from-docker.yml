@@ -11,23 +11,49 @@ on:
 
 env:
   DOCKER_IMAGE: ghcr.io/gounthar/openscad
-  PACKAGE_VERSION: 2025.11.19
-  PACKAGE_REVISION: 1
 
 jobs:
-  package-rpm-amd64:
-    name: Package RPM (amd64)
+  package-rpm:
+    name: Package RPM (${{ matrix.arch }})
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            target: x86_64
+            qemu: false
+          - arch: arm64
+            platform: linux/arm64
+            target: aarch64
+            qemu: true
+          - arch: riscv64
+            platform: linux/riscv64
+            target: riscv64
+            qemu: true
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Determine version
+        id: version
+        run: |
+          VERSION=$(date +%Y.%m.%d).${GITHUB_RUN_NUMBER}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Package version: ${VERSION}"
+
       - name: Install RPM build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y rpm rpmlint
+
+      - name: Set up QEMU
+        if: matrix.qemu
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker
         run: |
@@ -36,33 +62,62 @@ jobs:
 
       - name: Pull Docker image
         run: |
-          docker pull --platform linux/amd64 ${{ env.DOCKER_IMAGE }}:latest
+          docker pull --platform ${{ matrix.platform }} ${{ env.DOCKER_IMAGE }}:latest
 
-      - name: Extract OpenSCAD binary and data
+      - name: Extract OpenSCAD binary, data, and documentation
         run: |
-          CONTAINER_ID=$(docker create --platform linux/amd64 ${{ env.DOCKER_IMAGE }}:latest)
+          CONTAINER_ID=$(docker create --platform ${{ matrix.platform }} ${{ env.DOCKER_IMAGE }}:latest)
 
           mkdir -p extract
+
+          # Extract binary
           docker cp ${CONTAINER_ID}:/usr/local/bin/openscad extract/openscad
-          docker cp ${CONTAINER_ID}:/usr/local/share extract/share 2>/dev/null || true
+
+          # Extract data files
+          docker cp ${CONTAINER_ID}:/usr/local/share extract/share 2>&1 || echo "Warning: Could not extract share directory"
+
+          # Extract license and docs from common locations
+          docker cp ${CONTAINER_ID}:/usr/local/share/doc/openscad/COPYING extract/COPYING 2>&1 || \
+          docker cp ${CONTAINER_ID}:/usr/share/doc/openscad/COPYING extract/COPYING 2>&1 || \
+          echo "COPYING not found in container"
+
+          docker cp ${CONTAINER_ID}:/usr/local/share/doc/openscad/README.md extract/README.md 2>&1 || \
+          docker cp ${CONTAINER_ID}:/usr/share/doc/openscad/README.md extract/README.md 2>&1 || \
+          echo "README.md not found in container"
 
           docker rm ${CONTAINER_ID}
 
-          chmod +x extract/openscad
-
-          # Verify the binary was extracted
+          # Validate binary extraction
           if [ ! -f extract/openscad ]; then
             echo "Error: Failed to extract openscad binary"
             exit 1
           fi
 
-          # Log whether share directory was found
-          if [ -d extract/share ]; then
-            echo "Found share directory with data files"
-          else
-            echo "Warning: No share directory found - package will not include data files"
+          chmod +x extract/openscad
+
+          # Fallback to repo files if not found in container
+          if [ ! -f extract/COPYING ]; then
+            if [ -f COPYING ]; then
+              cp COPYING extract/COPYING
+              echo "Using COPYING from repository"
+            else
+              echo "Error: COPYING file not found in Docker image or repository"
+              echo "The license file is required for RPM packaging and GPL compliance"
+              exit 1
+            fi
+          fi
+          if [ ! -f extract/README.md ]; then
+            if [ -f README.md ]; then
+              cp README.md extract/README.md
+              echo "Using README.md from repository"
+            else
+              echo "Error: README.md file not found in Docker image or repository"
+              echo "Documentation is required for proper RPM packaging"
+              exit 1
+            fi
           fi
 
+          echo "Extracted files:"
           ls -la extract/
 
       - name: Set up RPM build tree
@@ -71,181 +126,27 @@ jobs:
 
           # Copy binary and data to SOURCES
           cp extract/openscad ~/rpmbuild/SOURCES/
-          cp -r extract/share ~/rpmbuild/SOURCES/ 2>/dev/null || true
+          cp extract/COPYING ~/rpmbuild/SOURCES/
+          cp extract/README.md ~/rpmbuild/SOURCES/
+          cp -r extract/share ~/rpmbuild/SOURCES/ 2>&1 || true
 
           # Copy spec file
           cp rpm/openscad.spec ~/rpmbuild/SPECS/
 
           # Update version in spec
-          sed -i "s/^Version:.*/Version:        ${{ env.PACKAGE_VERSION }}/" ~/rpmbuild/SPECS/openscad.spec
+          sed -i "s/^Version:.*/Version:        ${{ steps.version.outputs.version }}/" ~/rpmbuild/SPECS/openscad.spec
 
       - name: Build RPM package
         run: |
           cd ~/rpmbuild/SPECS
-          rpmbuild -bb --target x86_64 openscad.spec
+          rpmbuild -bb --target ${{ matrix.target }} openscad.spec
 
           echo "Built RPM package:"
-          ls -lh ~/rpmbuild/RPMS/x86_64/
+          ls -lh ~/rpmbuild/RPMS/${{ matrix.target }}/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v5
         with:
-          name: rpm-amd64-docker
-          path: /home/runner/rpmbuild/RPMS/x86_64/*.rpm
-          retention-days: 7
-
-  package-rpm-arm64:
-    name: Package RPM (arm64)
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Install RPM build tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y rpm rpmlint
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker
-        run: |
-          docker --version
-          docker info
-
-      - name: Pull Docker image
-        run: |
-          docker pull --platform linux/arm64 ${{ env.DOCKER_IMAGE }}:latest
-
-      - name: Extract OpenSCAD binary and data
-        run: |
-          CONTAINER_ID=$(docker create --platform linux/arm64 ${{ env.DOCKER_IMAGE }}:latest)
-
-          mkdir -p extract
-          docker cp ${CONTAINER_ID}:/usr/local/bin/openscad extract/openscad
-          docker cp ${CONTAINER_ID}:/usr/local/share extract/share 2>/dev/null || true
-
-          docker rm ${CONTAINER_ID}
-
-          chmod +x extract/openscad
-
-          # Verify the binary was extracted
-          if [ ! -f extract/openscad ]; then
-            echo "Error: Failed to extract openscad binary"
-            exit 1
-          fi
-
-          # Log whether share directory was found
-          if [ -d extract/share ]; then
-            echo "Found share directory with data files"
-          else
-            echo "Warning: No share directory found - package will not include data files"
-          fi
-
-          ls -la extract/
-
-      - name: Set up RPM build tree
-        run: |
-          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-
-          cp extract/openscad ~/rpmbuild/SOURCES/
-          cp -r extract/share ~/rpmbuild/SOURCES/ 2>/dev/null || true
-          cp rpm/openscad.spec ~/rpmbuild/SPECS/
-
-          sed -i "s/^Version:.*/Version:        ${{ env.PACKAGE_VERSION }}/" ~/rpmbuild/SPECS/openscad.spec
-
-      - name: Build RPM package
-        run: |
-          cd ~/rpmbuild/SPECS
-          rpmbuild -bb --target aarch64 openscad.spec
-
-          echo "Built RPM package:"
-          ls -lh ~/rpmbuild/RPMS/aarch64/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: rpm-arm64-docker
-          path: /home/runner/rpmbuild/RPMS/aarch64/*.rpm
-          retention-days: 7
-
-  package-rpm-riscv64:
-    name: Package RPM (riscv64)
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Install RPM build tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y rpm rpmlint
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker
-        run: |
-          docker --version
-          docker info
-
-      - name: Pull Docker image
-        run: |
-          docker pull --platform linux/riscv64 ${{ env.DOCKER_IMAGE }}:latest
-
-      - name: Extract OpenSCAD binary and data
-        run: |
-          CONTAINER_ID=$(docker create --platform linux/riscv64 ${{ env.DOCKER_IMAGE }}:latest)
-
-          mkdir -p extract
-          docker cp ${CONTAINER_ID}:/usr/local/bin/openscad extract/openscad
-          docker cp ${CONTAINER_ID}:/usr/local/share extract/share 2>/dev/null || true
-
-          docker rm ${CONTAINER_ID}
-
-          chmod +x extract/openscad
-
-          # Verify the binary was extracted
-          if [ ! -f extract/openscad ]; then
-            echo "Error: Failed to extract openscad binary"
-            exit 1
-          fi
-
-          # Log whether share directory was found
-          if [ -d extract/share ]; then
-            echo "Found share directory with data files"
-          else
-            echo "Warning: No share directory found - package will not include data files"
-          fi
-
-          ls -la extract/
-
-      - name: Set up RPM build tree
-        run: |
-          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-
-          cp extract/openscad ~/rpmbuild/SOURCES/
-          cp -r extract/share ~/rpmbuild/SOURCES/ 2>/dev/null || true
-          cp rpm/openscad.spec ~/rpmbuild/SPECS/
-
-          sed -i "s/^Version:.*/Version:        ${{ env.PACKAGE_VERSION }}/" ~/rpmbuild/SPECS/openscad.spec
-
-      - name: Build RPM package
-        run: |
-          cd ~/rpmbuild/SPECS
-          rpmbuild -bb --target riscv64 openscad.spec
-
-          echo "Built RPM package:"
-          ls -lh ~/rpmbuild/RPMS/riscv64/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: rpm-riscv64-docker
-          path: /home/runner/rpmbuild/RPMS/riscv64/*.rpm
+          name: rpm-${{ matrix.arch }}-docker
+          path: /home/runner/rpmbuild/RPMS/${{ matrix.target }}/*.rpm
           retention-days: 7

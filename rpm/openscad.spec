@@ -69,6 +69,8 @@ if [ -d %{_sourcedir}/share ]; then
 fi
 
 %files
+%license COPYING
+%doc README.md
 %{_bindir}/openscad
 %{_datadir}/applications/openscad.desktop
 %{_datadir}/icons/hicolor/*/apps/openscad.*
