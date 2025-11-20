@@ -64,30 +64,19 @@ jobs:
         run: |
           docker pull --platform ${{ matrix.platform }} ${{ env.DOCKER_IMAGE }}:latest
 
-      - name: Extract OpenSCAD binary and data
+      - name: Extract OpenSCAD binary, data, and documentation
         run: |
           CONTAINER_ID=$(docker create --platform ${{ matrix.platform }} ${{ env.DOCKER_IMAGE }}:latest)
 
           mkdir -p extract
+
+          # Extract binary
           docker cp ${CONTAINER_ID}:/usr/local/bin/openscad extract/openscad
+
+          # Extract data files
           docker cp ${CONTAINER_ID}:/usr/local/share extract/share 2>&1 || echo "Warning: Could not extract share directory"
 
-          docker rm ${CONTAINER_ID}
-
-          if [ ! -f extract/openscad ]; then
-            echo "Error: Failed to extract openscad binary"
-            exit 1
-          fi
-
-          chmod +x extract/openscad
-          echo "Extracted files:"
-          ls -la extract/
-
-      - name: Extract license and documentation
-        run: |
-          CONTAINER_ID=$(docker create --platform ${{ matrix.platform }} ${{ env.DOCKER_IMAGE }}:latest)
-
-          # Try to extract license and docs from common locations
+          # Extract license and docs from common locations
           docker cp ${CONTAINER_ID}:/usr/local/share/doc/openscad/COPYING extract/COPYING 2>&1 || \
           docker cp ${CONTAINER_ID}:/usr/share/doc/openscad/COPYING extract/COPYING 2>&1 || \
           echo "COPYING not found in container"
@@ -97,6 +86,14 @@ jobs:
           echo "README.md not found in container"
 
           docker rm ${CONTAINER_ID}
+
+          # Validate binary extraction
+          if [ ! -f extract/openscad ]; then
+            echo "Error: Failed to extract openscad binary"
+            exit 1
+          fi
+
+          chmod +x extract/openscad
 
           # Fallback to repo files if not found in container
           if [ ! -f extract/COPYING ]; then
@@ -119,6 +116,9 @@ jobs:
               exit 1
             fi
           fi
+
+          echo "Extracted files:"
+          ls -la extract/
 
       - name: Set up RPM build tree
         run: |
