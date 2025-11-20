@@ -9,6 +9,10 @@ URL:            https://openscad.org/
 # Pre-built binary package - no source required
 # Binaries extracted from Docker image
 
+# Disable debuginfo generation and binary stripping for pre-built binaries
+%global debug_package %{nil}
+%global __strip /bin/true
+
 # Runtime dependencies for Fedora
 Requires:       qt5-qtbase
 Requires:       qt5-qtmultimedia
@@ -62,6 +66,11 @@ install -d %{buildroot}%{_datadir}/openscad
 # Install binary
 install -p -m 0755 %{_sourcedir}/openscad %{buildroot}%{_bindir}/openscad
 
+# Install license and documentation
+install -d %{buildroot}%{_defaultdocdir}/%{name}
+install -p -m 0644 %{_sourcedir}/COPYING %{buildroot}%{_defaultdocdir}/%{name}/COPYING
+install -p -m 0644 %{_sourcedir}/README.md %{buildroot}%{_defaultdocdir}/%{name}/README.md
+
 # Install data files if present
 if [ -d %{_sourcedir}/share ]; then
     # Copy all data files with attributes preserved
@@ -69,9 +78,9 @@ if [ -d %{_sourcedir}/share ]; then
 fi
 
 %files
-%license COPYING
-%doc README.md
 %{_bindir}/openscad
+%{_defaultdocdir}/%{name}/COPYING
+%{_defaultdocdir}/%{name}/README.md
 %{_datadir}/applications/openscad.desktop
 %{_datadir}/icons/hicolor/*/apps/openscad.*
 %{_datadir}/metainfo/org.openscad.OpenSCAD.appdata.xml
