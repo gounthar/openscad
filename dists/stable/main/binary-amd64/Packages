@@ -1,14 +1,14 @@
 Package: openscad
-Version: 2025.11.20.31-1
+Version: 2025.11.20.33-1
 Architecture: amd64
 Maintainer: Bruno Verachten <gounthar@gmail.com>
 Installed-Size: 71096
-Depends: lib3mf1, libatomic1, libboost-filesystem1.83.0, libboost-program-options1.83.0, libboost-regex1.83.0, libc6, libcairo2, libdouble-conversion3, libegl1, libfontconfig1, libfreetype6, libgcc-s1, libgl1, libglew2.2, libglib2.0-0, libglu1-mesa, libgmp10, libharfbuzz0b, libmimalloc2.1, libmpfr6, libopencsg1, libopengl0, libqscintilla2-qt5-15, libqt5core5t64, libqt5dbus5t64, libqt5gamepad5, libqt5gui5t64, libqt5multimedia5, libqt5network5t64, libqt5printsupport5t64, libqt5widgets5t64, libstdc++6, libx11-6, libxml2, libzip4
-Filename: pool/main/openscad_2025.11.20.31-1_amd64.deb
-Size: 10954474
-MD5sum: 23a41f7fe659e323be2798ac5af2f381
-SHA1: c9ee18423b96a5f9885f8e2455ff108034f62e40
-SHA256: 50bf7b78fdafeee518a3920731b8525315c9a61ddf8c30e977176f685ebfdd76
+Depends: lib3mf1, libatomic1, libboost-filesystem1.83.0, libboost-program-options1.83.0, libboost-regex1.83.0, libc6, libcairo2, libdouble-conversion3, libegl1, libfontconfig1, libfreetype6, libgcc-s1, libgl1, libglew2.2, libglib2.0-0, libglu1-mesa, libgmp10, libharfbuzz0b, libmimalloc3, libmpfr6, libopencsg1, libopengl0, libqscintilla2-qt5-15, libqt5core5t64, libqt5dbus5t64, libqt5gamepad5, libqt5gui5t64, libqt5multimedia5, libqt5network5t64, libqt5printsupport5t64, libqt5widgets5t64, libstdc++6, libx11-6, libxml2, libzip5
+Filename: pool/main/openscad_2025.11.20.33-1_amd64.deb
+Size: 10954230
+MD5sum: 4fa981a93843d7fe59a6742f7fc8baba
+SHA1: 3f2630171b1b76699b0a8b674038a889b3846ec2
+SHA256: dd88be1aafc56ac050e94e829ea065e6a8d1bd6cb76df32b643d9e934e59a870
 Section: graphics
 Priority: optional
 Homepage: https://openscad.org/
