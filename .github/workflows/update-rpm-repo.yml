@@ -1,0 +1,400 @@
+name: Update RPM Repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Workflow run ID to get packages from (leave empty for latest)'
+        type: string
+        required: false
+  workflow_run:
+    workflows: ["Package RPM from Docker Image"]
+    types:
+      - completed
+    branches:
+      - multiplatform
+
+permissions:
+  contents: write
+
+env:
+  GPG_KEY_ID: '56188341425B007407229B48FB1963FC3575A39D'
+
+jobs:
+  update-repo:
+    name: Update RPM Repository
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository for composite action
+        uses: actions/checkout@v4
+
+      - name: Determine workflow run ID
+        id: run
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "${{ inputs.run_id }}" ]; then
+              echo "run_id=${{ inputs.run_id }}" >> $GITHUB_OUTPUT
+            else
+              RUN_ID=$(gh run list --workflow=package-rpm-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+              if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+                echo "Error: No successful workflow runs found for package-rpm-from-docker.yml"
+                exit 1
+              fi
+              echo "run_id=${RUN_ID}" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Check if run has artifacts
+        id: check_artifacts
+        uses: ./.github/actions/check-run-artifacts
+        with:
+          run_id: ${{ steps.run.outputs.run_id }}
+          github_token: ${{ github.token }}
+
+      - name: Checkout gh-pages branch
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: Install RPM tools
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y createrepo-c gnupg
+
+      - name: Import GPG key for signing
+        id: gpg
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Warning: GPG_PRIVATE_KEY secret not set, repository will not be signed"
+            echo "signed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Importing GPG key for package signing..."
+            echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+            gpg --list-secret-keys
+            echo "GPG key imported successfully"
+            echo "signed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download packages from workflow
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        run: |
+          rm -rf downloads
+          mkdir -p downloads
+          echo "Downloading artifacts from run ${{ steps.run.outputs.run_id }}..."
+          gh run download ${{ steps.run.outputs.run_id }} --dir downloads
+          echo "Downloaded packages:"
+          find downloads -name "*.rpm" -type f
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Setup RPM repository structure
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        run: |
+          # Create directory structure for each architecture
+          mkdir -p rpm/fedora/{x86_64,aarch64,riscv64}
+
+          # Determine architectures from artifacts and copy packages
+          echo "Processing RPM packages..."
+
+          # x86_64 packages
+          if find downloads -name "*x86_64*.rpm" -type f | grep -q .; then
+            echo "Found x86_64 packages"
+            if ! find downloads -name "*x86_64*.rpm" -type f -exec cp {} rpm/fedora/x86_64/ \;; then
+              echo "Error: Failed to copy x86_64 packages"
+              exit 1
+            fi
+          fi
+
+          # aarch64 packages
+          if find downloads -name "*aarch64*.rpm" -type f | grep -q .; then
+            echo "Found aarch64 packages"
+            if ! find downloads -name "*aarch64*.rpm" -type f -exec cp {} rpm/fedora/aarch64/ \;; then
+              echo "Error: Failed to copy aarch64 packages"
+              exit 1
+            fi
+          fi
+
+          # riscv64 packages
+          if find downloads -name "*riscv64*.rpm" -type f | grep -q .; then
+            echo "Found riscv64 packages"
+            if ! find downloads -name "*riscv64*.rpm" -type f -exec cp {} rpm/fedora/riscv64/ \;; then
+              echo "Error: Failed to copy riscv64 packages"
+              exit 1
+            fi
+          fi
+
+          # List packages by architecture
+          echo ""
+          echo "Packages by architecture:"
+          for arch in x86_64 aarch64 riscv64; do
+            if ls rpm/fedora/${arch}/*.rpm 1> /dev/null 2>&1; then
+              echo "  ${arch}:"
+              ls -lh rpm/fedora/${arch}/*.rpm | awk '{print "    " $NF " (" $5 ")"}'
+            fi
+          done
+
+      - name: Generate repository metadata for each architecture
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        run: |
+          for arch in x86_64 aarch64 riscv64; do
+            ARCH_DIR="rpm/fedora/${arch}"
+
+            # Skip if no packages exist for this architecture
+            if ! ls ${ARCH_DIR}/*.rpm 1> /dev/null 2>&1; then
+              echo "No packages found for ${arch}, skipping..."
+              continue
+            fi
+
+            echo "Creating repository metadata for ${arch}..."
+
+            # Create or update repository metadata
+            if [ -d "${ARCH_DIR}/repodata" ]; then
+              if ! createrepo_c --update "${ARCH_DIR}"; then
+                echo "Error: Failed to update repository metadata for ${arch}"
+                exit 1
+              fi
+            else
+              if ! createrepo_c "${ARCH_DIR}"; then
+                echo "Error: Failed to create repository metadata for ${arch}"
+                exit 1
+              fi
+            fi
+
+            # Count packages
+            PKG_COUNT=$(ls -1 ${ARCH_DIR}/*.rpm 2>/dev/null | wc -l)
+            echo "  ${PKG_COUNT} packages in ${arch} repository"
+          done
+
+      - name: Sign repository metadata
+        if: steps.check_artifacts.outputs.has_artifacts == 'true' && steps.gpg.outputs.signed == 'true'
+        run: |
+          for arch in x86_64 aarch64 riscv64; do
+            REPOMD_FILE="rpm/fedora/${arch}/repodata/repomd.xml"
+
+            # Skip if repodata doesn't exist
+            if [ ! -f "${REPOMD_FILE}" ]; then
+              echo "No repodata found for ${arch}, skipping signature..."
+              continue
+            fi
+
+            echo "Signing repository metadata for ${arch}..."
+            if ! gpg --batch --yes --detach-sign --armor "${REPOMD_FILE}"; then
+              echo "Error: Failed to sign repository metadata for ${arch}"
+              exit 1
+            fi
+
+            if [ -f "${REPOMD_FILE}.asc" ]; then
+              echo "  Signature created: ${REPOMD_FILE}.asc"
+            else
+              echo "Error: Signature file not created for ${arch}"
+              exit 1
+            fi
+          done
+
+      - name: Export GPG public key
+        if: steps.check_artifacts.outputs.has_artifacts == 'true' && steps.gpg.outputs.signed == 'true'
+        run: |
+          echo "Exporting GPG public key..."
+          if ! gpg --armor --export ${{ env.GPG_KEY_ID }} > rpm/RPM-GPG-KEY; then
+            echo "Error: Failed to export GPG public key"
+            exit 1
+          fi
+
+          if [ -f rpm/RPM-GPG-KEY ]; then
+            echo "GPG public key exported to rpm/RPM-GPG-KEY"
+            ls -lh rpm/RPM-GPG-KEY
+          else
+            echo "Error: GPG public key file not created"
+            exit 1
+          fi
+
+      - name: Create repository configuration file
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        run: |
+          # Set gpgcheck based on whether repository is signed
+          if [ "${{ steps.gpg.outputs.signed }}" = "true" ]; then
+            GPGCHECK=1
+            GPGKEY_LINE="gpgkey=https://gounthar.github.io/openscad/rpm/RPM-GPG-KEY"
+          else
+            GPGCHECK=0
+            GPGKEY_LINE="# gpgkey not configured (repository not signed)"
+          fi
+
+          cat > rpm/openscad.repo << EOF
+          [openscad]
+          name=OpenSCAD Multi-Arch
+          baseurl=https://gounthar.github.io/openscad/rpm/fedora/\$basearch
+          enabled=1
+          gpgcheck=${GPGCHECK}
+          ${GPGKEY_LINE}
+          EOF
+
+          echo "Created repository configuration file:"
+          cat rpm/openscad.repo
+
+      - name: Update index page
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        run: |
+          cat > index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>OpenSCAD Package Repositories</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 900px; margin: 50px auto; padding: 20px; }
+              h1 { color: #333; }
+              h2 { color: #555; margin-top: 30px; }
+              pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+              code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; }
+              .package-type { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; }
+              .supported { list-style-type: none; padding-left: 0; }
+              .supported li { padding: 5px 0; }
+              .supported li::before { content: "✓ "; color: #4caf50; font-weight: bold; }
+            </style>
+          </head>
+          <body>
+            <h1>OpenSCAD Package Repositories</h1>
+            <p>Multi-architecture packages for OpenSCAD supporting AMD64, ARM64, and RISC-V64.</p>
+
+            <h2>Supported Architectures</h2>
+            <ul class="supported">
+              <li><strong>x86_64/amd64</strong> - Intel/AMD 64-bit processors</li>
+              <li><strong>aarch64/arm64</strong> - ARM 64-bit processors</li>
+              <li><strong>riscv64</strong> - RISC-V 64-bit processors</li>
+            </ul>
+
+            <div class="package-type">
+              <h2>Debian/Ubuntu (APT)</h2>
+
+              <h3>1. Import the GPG key</h3>
+              <pre>curl -fsSL https://github.com/gounthar/docker-for-riscv64/releases/download/gpg-key/gpg-public-key.asc | sudo gpg --dearmor -o /usr/share/keyrings/openscad-archive-keyring.gpg</pre>
+
+              <h3>2. Add the repository</h3>
+              <pre>echo "deb [signed-by=/usr/share/keyrings/openscad-archive-keyring.gpg] https://gounthar.github.io/openscad stable main" | sudo tee /etc/apt/sources.list.d/openscad.list</pre>
+
+              <h3>3. Update and install</h3>
+              <pre>sudo apt-get update
+          sudo apt-get install openscad</pre>
+            </div>
+
+            <div class="package-type">
+              <h2>Fedora/RHEL/Rocky/AlmaLinux (DNF/YUM)</h2>
+
+              <h3>1. Import the GPG key</h3>
+              <pre>sudo rpm --import https://gounthar.github.io/openscad/rpm/RPM-GPG-KEY</pre>
+
+              <h3>2. Add the repository</h3>
+              <pre>sudo curl -L https://gounthar.github.io/openscad/rpm/openscad.repo \
+            -o /etc/yum.repos.d/openscad.repo</pre>
+
+              <h3>3. Install</h3>
+              <pre>sudo dnf install openscad</pre>
+
+              <p><strong>Alternative:</strong> Manual repository configuration</p>
+              <pre>sudo tee /etc/yum.repos.d/openscad.repo &lt;&lt;EOF
+          [openscad]
+          name=OpenSCAD Multi-Arch
+          baseurl=https://gounthar.github.io/openscad/rpm/fedora/\$basearch
+          enabled=1
+          gpgcheck=1
+          gpgkey=https://gounthar.github.io/openscad/rpm/RPM-GPG-KEY
+          EOF</pre>
+            </div>
+
+            <h2>Docker Images</h2>
+            <p>Pre-built Docker images are available for all architectures:</p>
+            <pre>docker pull ghcr.io/gounthar/openscad:latest</pre>
+
+            <h2>Direct Downloads</h2>
+            <p>Download packages directly from <a href="https://github.com/gounthar/openscad/releases">GitHub Releases</a>.</p>
+
+            <h2>Repository Structure</h2>
+            <ul>
+              <li><strong>APT:</strong> <code>dists/stable/main/binary-{amd64,arm64,riscv64}/</code></li>
+              <li><strong>RPM:</strong> <code>rpm/fedora/{x86_64,aarch64,riscv64}/</code></li>
+            </ul>
+
+            <hr>
+            <p><small>Generated by <a href="https://github.com/gounthar/openscad">gounthar/openscad</a></small></p>
+          </body>
+          </html>
+          EOF
+
+          echo "Updated index.html with RPM installation instructions"
+
+      - name: Commit and push changes
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git status
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "update RPM repository with latest packages
+
+          Automated update from workflow run ${{ steps.run.outputs.run_id }}"
+            git push origin gh-pages
+          fi
+
+      - name: Summary
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        run: |
+          echo "## RPM Repository Updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository URL:** https://gounthar.github.io/openscad/rpm/fedora/\$basearch" >> $GITHUB_STEP_SUMMARY
+          echo "**GPG Signed:** ${{ steps.gpg.outputs.signed }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Count packages by architecture
+          echo "### Packages by Architecture" >> $GITHUB_STEP_SUMMARY
+          for arch in x86_64 aarch64 riscv64; do
+            if ls rpm/fedora/${arch}/*.rpm 1>/dev/null 2>&1; then
+              PKG_COUNT=$(ls -1 rpm/fedora/${arch}/*.rpm | wc -l)
+              echo "- **${arch}:** ${PKG_COUNT} packages" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Installation Instructions" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo '# Import GPG key' >> $GITHUB_STEP_SUMMARY
+          echo 'sudo rpm --import https://gounthar.github.io/openscad/rpm/RPM-GPG-KEY' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '# Add repository' >> $GITHUB_STEP_SUMMARY
+          echo 'sudo curl -L https://gounthar.github.io/openscad/rpm/openscad.repo \' >> $GITHUB_STEP_SUMMARY
+          echo '  -o /etc/yum.repos.d/openscad.repo' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '# Install' >> $GITHUB_STEP_SUMMARY
+          echo 'sudo dnf install openscad' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # List packages
+          echo "### Package Details" >> $GITHUB_STEP_SUMMARY
+          for arch in x86_64 aarch64 riscv64; do
+            if ls rpm/fedora/${arch}/*.rpm 1>/dev/null 2>&1; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**${arch}:**" >> $GITHUB_STEP_SUMMARY
+              ls rpm/fedora/${arch}/*.rpm | while read pkg; do
+                name=$(basename "$pkg")
+                size=$(du -h "$pkg" | cut -f1)
+                echo "- ${name} (${size})" >> $GITHUB_STEP_SUMMARY
+              done
+            fi
+          done
