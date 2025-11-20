@@ -98,14 +98,15 @@ jobs:
 
           docker rm ${CONTAINER_ID}
 
-          # Fallback to repo files or placeholder if not found in container
+          # Fallback to repo files if not found in container
           if [ ! -f extract/COPYING ]; then
             if [ -f COPYING ]; then
               cp COPYING extract/COPYING
               echo "Using COPYING from repository"
             else
-              echo "See https://github.com/openscad/openscad/blob/master/COPYING" > extract/COPYING
-              echo "Warning: COPYING not found, using placeholder"
+              echo "Error: COPYING file not found in Docker image or repository"
+              echo "The license file is required for RPM packaging and GPL compliance"
+              exit 1
             fi
           fi
           if [ ! -f extract/README.md ]; then
@@ -113,8 +114,9 @@ jobs:
               cp README.md extract/README.md
               echo "Using README.md from repository"
             else
-              echo "See https://github.com/openscad/openscad" > extract/README.md
-              echo "Warning: README.md not found, using placeholder"
+              echo "Error: README.md file not found in Docker image or repository"
+              echo "Documentation is required for proper RPM packaging"
+              exit 1
             fi
           fi
 
