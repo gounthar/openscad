@@ -278,17 +278,29 @@ jobs:
                 if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
                   echo "Push failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
 
-                  # Fetch latest changes
-                  git fetch origin gh-pages
+                  # Save our changes to temporary directory
+                  TEMP_DIR=$(mktemp -d)
+                  cp -a downloads/debian-* "$TEMP_DIR/" 2>/dev/null || true
+                  cp -a pool/ "$TEMP_DIR/" 2>/dev/null || true
+                  cp -a dists/ "$TEMP_DIR/" 2>/dev/null || true
+                  cp -a debian/ "$TEMP_DIR/" 2>/dev/null || true
+                  cp -a index.html "$TEMP_DIR/" 2>/dev/null || true
 
-                  # Use merge with strategy to prefer our changes (we're regenerating metadata)
-                  if ! git merge origin/gh-pages -X ours --no-edit; then
-                    echo "Merge failed, trying to resolve..."
-                    # If merge fails, accept all our changes
-                    git checkout --ours .
-                    git add -A
-                    git commit --no-edit || true
-                  fi
+                  # Fetch and reset to latest gh-pages
+                  git fetch origin gh-pages
+                  git reset --hard origin/gh-pages
+
+                  # Restore our changes
+                  cp -a "$TEMP_DIR"/debian-* downloads/ 2>/dev/null || true
+                  cp -a "$TEMP_DIR"/pool . 2>/dev/null || true
+                  cp -a "$TEMP_DIR"/dists . 2>/dev/null || true
+                  cp -a "$TEMP_DIR"/debian . 2>/dev/null || true
+                  cp -a "$TEMP_DIR"/index.html . 2>/dev/null || true
+                  rm -rf "$TEMP_DIR"
+
+                  # Re-commit
+                  git add -A
+                  git commit -m "Update APT repository with latest packages" || true
 
                   sleep 2
                 else
