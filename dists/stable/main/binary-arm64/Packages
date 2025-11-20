@@ -1,14 +1,14 @@
 Package: openscad
-Version: 2025.11.20.28-1
+Version: 2025.11.20.29-1
 Architecture: arm64
 Maintainer: Bruno Verachten <gounthar@gmail.com>
 Installed-Size: 73460
-Depends: libqt5core5t64, libqt5gui5t64, libqt5widgets5t64, libqt5multimedia5, libqt5svg5, libcgal27, libopencsg1, libqscintilla2-qt5-15, libfreetype6, libfontconfig1, libharfbuzz0b, libglew2.2, libgmp10, libmpfr6, libzip4, libdouble-conversion3, libtbb12, libboost-filesystem1.83.0, libboost-regex1.83.0, libboost-system1.83.0, lib3mf1, libmimalloc2.1
-Filename: pool/main/openscad_2025.11.20.28-1_arm64.deb
-Size: 10917254
-MD5sum: 37f323bfe9b3aa981d5bd6226f5d32a0
-SHA1: 0879e8172d310cbf2cf7d1b731864929c11d0c60
-SHA256: 30caa9e1a4e770c41f862254f5a55779e13bf806c317cd363131916535137585
+Depends: lib3mf1, libatomic1, libboost-filesystem1.83.0, libboost-program-options1.83.0, libboost-regex1.83.0, libc6, libcairo2, libdouble-conversion3, libegl1, libfontconfig1, libfreetype6, libgcc-s1, libgl1, libglew2.2, libglib2.0-0, libglu1-mesa, libgmp10, libharfbuzz0b, libmimalloc2.1, libmpfr6, libopencsg1, libopengl0, libqscintilla2-qt5-15, libqt5core5t64, libqt5dbus5t64, libqt5gamepad5, libqt5gui5t64, libqt5multimedia5, libqt5network5t64, libqt5printsupport5t64, libqt5widgets5t64, libstdc++6, libx11-6, libxml2, libzip4
+Filename: pool/main/openscad_2025.11.20.29-1_arm64.deb
+Size: 10917942
+MD5sum: 178de429c90a9df3f1958b0ef581a5b1
+SHA1: bb1ffa9ee329faee4b69e92d69275d8b4b45c4f6
+SHA256: b5e83c701584b9f87a823e24f4dc45e54564158736432bdc94404583abcdbb35
 Section: graphics
 Priority: optional
 Homepage: https://openscad.org/
