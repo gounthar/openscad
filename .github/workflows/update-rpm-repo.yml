@@ -161,9 +161,15 @@ jobs:
 
             # Create or update repository metadata
             if [ -d "${ARCH_DIR}/repodata" ]; then
-              createrepo_c --update "${ARCH_DIR}"
+              if ! createrepo_c --update "${ARCH_DIR}"; then
+                echo "Error: Failed to update repository metadata for ${arch}"
+                exit 1
+              fi
             else
-              createrepo_c "${ARCH_DIR}"
+              if ! createrepo_c "${ARCH_DIR}"; then
+                echo "Error: Failed to create repository metadata for ${arch}"
+                exit 1
+              fi
             fi
 
             # Count packages
@@ -184,12 +190,16 @@ jobs:
             fi
 
             echo "Signing repository metadata for ${arch}..."
-            gpg --batch --yes --detach-sign --armor "${REPOMD_FILE}"
+            if ! gpg --batch --yes --detach-sign --armor "${REPOMD_FILE}"; then
+              echo "Error: Failed to sign repository metadata for ${arch}"
+              exit 1
+            fi
 
             if [ -f "${REPOMD_FILE}.asc" ]; then
               echo "  Signature created: ${REPOMD_FILE}.asc"
             else
-              echo "  Warning: Failed to create signature for ${arch}"
+              echo "Error: Signature file not created for ${arch}"
+              exit 1
             fi
           done
 
