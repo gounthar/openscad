@@ -33,6 +33,7 @@ Requires:       boost-filesystem
 Requires:       boost-regex
 Requires:       boost-system
 Requires:       lib3mf
+Requires:       mimalloc
 
 Recommends:     openscad-MCAD
 

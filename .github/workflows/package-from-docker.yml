@@ -120,6 +120,7 @@ jobs:
           Installed-Size: ${INSTALLED_SIZE}
           Maintainer: Bruno Verachten <gounthar@gmail.com>
           Homepage: https://openscad.org/
+          Depends: libqt5core5t64, libqt5gui5t64, libqt5widgets5t64, libqt5multimedia5, libqt5svg5, libcgal27, libopencsg1, libqscintilla2-qt5-15, libfreetype6, libfontconfig1, libharfbuzz0b, libglew2.2, libgmp10, libmpfr6, libzip4, libdouble-conversion3, libtbb12, libboost-filesystem1.83.0, libboost-regex1.83.0, libboost-system1.83.0, lib3mf1, libmimalloc2.1
           Description: script file based graphical CAD environment
            OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
            aspects rather than artistic ones.
@@ -234,6 +235,7 @@ jobs:
           Installed-Size: ${INSTALLED_SIZE}
           Maintainer: Bruno Verachten <gounthar@gmail.com>
           Homepage: https://openscad.org/
+          Depends: libqt5core5t64, libqt5gui5t64, libqt5widgets5t64, libqt5multimedia5, libqt5svg5, libcgal27, libopencsg1, libqscintilla2-qt5-15, libfreetype6, libfontconfig1, libharfbuzz0b, libglew2.2, libgmp10, libmpfr6, libzip4, libdouble-conversion3, libtbb12, libboost-filesystem1.83.0, libboost-regex1.83.0, libboost-system1.83.0, lib3mf1, libmimalloc2.1
           Description: script file based graphical CAD environment
            OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
            aspects rather than artistic ones.
@@ -342,6 +344,7 @@ jobs:
           Installed-Size: ${INSTALLED_SIZE}
           Maintainer: Bruno Verachten <gounthar@gmail.com>
           Homepage: https://openscad.org/
+          Depends: libqt5core5t64, libqt5gui5t64, libqt5widgets5t64, libqt5multimedia5, libqt5svg5, libcgal27, libopencsg1, libqscintilla2-qt5-15, libfreetype6, libfontconfig1, libharfbuzz0b, libglew2.2, libgmp10, libmpfr6, libzip4, libdouble-conversion3, libtbb12, libboost-filesystem1.83.0, libboost-regex1.83.0, libboost-system1.83.0, lib3mf1, libmimalloc2.1
           Description: script file based graphical CAD environment
            OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
            aspects rather than artistic ones.
