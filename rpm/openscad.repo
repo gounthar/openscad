@@ -1,0 +1,6 @@
+[openscad]
+name=OpenSCAD Multi-Arch
+baseurl=https://gounthar.github.io/openscad/rpm/fedora/$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://gounthar.github.io/openscad/rpm/RPM-GPG-KEY
