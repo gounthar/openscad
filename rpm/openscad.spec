@@ -80,7 +80,8 @@ fi
 %{_datadir}/icons/hicolor/*/apps/openscad.*
 %{_datadir}/metainfo/org.openscad.OpenSCAD.appdata.xml
 %{_datadir}/mime/packages/openscad.xml
-%dir %{_datadir}/openscad/
+%{_mandir}/man1/openscad.1.gz
+%{_datadir}/openscad/
 
 %changelog
 * Wed Nov 19 2025 Bruno Verachten <gounthar@gmail.com> - 2025.11.19-1
