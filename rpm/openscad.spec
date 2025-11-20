@@ -14,26 +14,20 @@ URL:            https://openscad.org/
 %global __strip /bin/true
 
 # Runtime dependencies for Fedora
+# Note: RPM automatically detects most library dependencies
+# Only list packages that need explicit declaration
+
 Requires:       qt5-qtbase
 Requires:       qt5-qtmultimedia
-Requires:       qt5-qtsvg
-Requires:       CGAL
-Requires:       opencsg
+Requires:       qt5-qtgamepad
 Requires:       qscintilla-qt5
-Requires:       freetype
-Requires:       fontconfig
-Requires:       harfbuzz
-Requires:       glew
-Requires:       gmp
-Requires:       mpfr
-Requires:       libzip
-Requires:       double-conversion
-Requires:       tbb
-Requires:       boost-filesystem
-Requires:       boost-regex
-Requires:       boost-system
+Requires:       opencsg
 Requires:       lib3mf
 Requires:       mimalloc
+Requires:       boost-program-options
+Requires:       cairo
+Requires:       libxml2
+Requires:       mesa-libGLU
 
 Recommends:     openscad-MCAD
 
