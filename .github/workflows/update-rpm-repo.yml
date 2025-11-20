@@ -18,10 +18,7 @@ permissions:
   contents: write
 
 env:
-  ORIGIN: gounthar
-  LABEL: OpenSCAD Multi-Arch
   GPG_KEY_ID: '56188341425B007407229B48FB1963FC3575A39D'
-  GPG_PUBLIC_KEY_URL: 'https://github.com/gounthar/docker-for-riscv64/releases/download/gpg-key/gpg-public-key.asc'
 
 jobs:
   update-repo:
@@ -41,6 +38,10 @@ jobs:
               echo "run_id=${{ inputs.run_id }}" >> $GITHUB_OUTPUT
             else
               RUN_ID=$(gh run list --workflow=package-rpm-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+              if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+                echo "Error: No successful workflow runs found for package-rpm-from-docker.yml"
+                exit 1
+              fi
               echo "run_id=${RUN_ID}" >> $GITHUB_OUTPUT
             fi
           else
@@ -70,6 +71,7 @@ jobs:
           sudo apt-get install -y createrepo-c gnupg
 
       - name: Import GPG key for signing
+        id: gpg
         if: steps.check_artifacts.outputs.has_artifacts == 'true'
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -84,7 +86,6 @@ jobs:
             echo "GPG key imported successfully"
             echo "signed=true" >> $GITHUB_OUTPUT
           fi
-        id: gpg
 
       - name: Download packages from workflow
         if: steps.check_artifacts.outputs.has_artifacts == 'true'
@@ -110,19 +111,28 @@ jobs:
           # x86_64 packages
           if find downloads -name "*x86_64*.rpm" -type f | grep -q .; then
             echo "Found x86_64 packages"
-            find downloads -name "*x86_64*.rpm" -type f -exec cp {} rpm/fedora/x86_64/ \;
+            if ! find downloads -name "*x86_64*.rpm" -type f -exec cp {} rpm/fedora/x86_64/ \;; then
+              echo "Error: Failed to copy x86_64 packages"
+              exit 1
+            fi
           fi
 
           # aarch64 packages
           if find downloads -name "*aarch64*.rpm" -type f | grep -q .; then
             echo "Found aarch64 packages"
-            find downloads -name "*aarch64*.rpm" -type f -exec cp {} rpm/fedora/aarch64/ \;
+            if ! find downloads -name "*aarch64*.rpm" -type f -exec cp {} rpm/fedora/aarch64/ \;; then
+              echo "Error: Failed to copy aarch64 packages"
+              exit 1
+            fi
           fi
 
           # riscv64 packages
           if find downloads -name "*riscv64*.rpm" -type f | grep -q .; then
             echo "Found riscv64 packages"
-            find downloads -name "*riscv64*.rpm" -type f -exec cp {} rpm/fedora/riscv64/ \;
+            if ! find downloads -name "*riscv64*.rpm" -type f -exec cp {} rpm/fedora/riscv64/ \;; then
+              echo "Error: Failed to copy riscv64 packages"
+              exit 1
+            fi
           fi
 
           # List packages by architecture
@@ -199,13 +209,22 @@ jobs:
       - name: Create repository configuration file
         if: steps.check_artifacts.outputs.has_artifacts == 'true'
         run: |
-          cat > rpm/openscad.repo << 'EOF'
+          # Set gpgcheck based on whether repository is signed
+          if [ "${{ steps.gpg.outputs.signed }}" = "true" ]; then
+            GPGCHECK=1
+            GPGKEY_LINE="gpgkey=https://gounthar.github.io/openscad/rpm/RPM-GPG-KEY"
+          else
+            GPGCHECK=0
+            GPGKEY_LINE="# gpgkey not configured (repository not signed)"
+          fi
+
+          cat > rpm/openscad.repo << EOF
           [openscad]
           name=OpenSCAD Multi-Arch
-          baseurl=https://gounthar.github.io/openscad/rpm/fedora/$basearch
+          baseurl=https://gounthar.github.io/openscad/rpm/fedora/\$basearch
           enabled=1
-          gpgcheck=1
-          gpgkey=https://gounthar.github.io/openscad/rpm/RPM-GPG-KEY
+          gpgcheck=${GPGCHECK}
+          ${GPGKEY_LINE}
           EOF
 
           echo "Created repository configuration file:"
