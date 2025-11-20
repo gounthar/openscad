@@ -242,12 +242,11 @@ jobs:
             echo "No changes to commit"
           else
             TOTAL_DELETED=$(( ${{ steps.find_deb.outputs.count }} + ${{ steps.find_rpm.outputs.count }} ))
-            git commit -m "chore: cleanup old packages (${TOTAL_DELETED} packages removed)
-
-Automated cleanup from workflow run ${{ github.run_id }}
-- Removed .deb packages older than ${{ steps.config.outputs.days }} days
-- Removed .rpm packages older than ${{ steps.config.outputs.days }} days
-- Updated repository metadata"
+            git commit -m "chore: cleanup old packages (${TOTAL_DELETED} packages removed)" \
+                       -m "Automated cleanup from workflow run ${{ github.run_id }}" \
+                       -m "- Removed .deb packages older than ${{ steps.config.outputs.days }} days" \
+                       -m "- Removed .rpm packages older than ${{ steps.config.outputs.days }} days" \
+                       -m "- Updated repository metadata"
 
             git push origin gh-pages
             echo "Changes committed and pushed successfully"
