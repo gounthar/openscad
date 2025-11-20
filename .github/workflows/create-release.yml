@@ -25,6 +25,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-creation
+  cancel-in-progress: false
+
 jobs:
   create-release:
     name: Create GitHub Release
@@ -207,8 +211,14 @@ jobs:
           if ls release-assets/*.deb 1>/dev/null 2>&1; then
             echo "Uploading Debian packages..."
             for deb in release-assets/*.deb; do
-              echo "Uploading $(basename $deb)..."
-              gh release upload "${{ steps.version.outputs.tag }}" "$deb"
+              filename=$(basename "$deb")
+              echo "Uploading $filename..."
+              # Use --clobber to replace existing assets with same name
+              if ! gh release upload "${{ steps.version.outputs.tag }}" "$deb" --clobber; then
+                echo "Warning: Failed to upload $filename, retrying..."
+                sleep 2
+                gh release upload "${{ steps.version.outputs.tag }}" "$deb" --clobber || echo "Error: Failed to upload $filename after retry"
+              fi
             done
           fi
 
@@ -216,12 +226,18 @@ jobs:
           if ls release-assets/*.rpm 1>/dev/null 2>&1; then
             echo "Uploading RPM packages..."
             for rpm in release-assets/*.rpm; do
-              echo "Uploading $(basename $rpm)..."
-              gh release upload "${{ steps.version.outputs.tag }}" "$rpm"
+              filename=$(basename "$rpm")
+              echo "Uploading $filename..."
+              # Use --clobber to replace existing assets with same name
+              if ! gh release upload "${{ steps.version.outputs.tag }}" "$rpm" --clobber; then
+                echo "Warning: Failed to upload $filename, retrying..."
+                sleep 2
+                gh release upload "${{ steps.version.outputs.tag }}" "$rpm" --clobber || echo "Error: Failed to upload $filename after retry"
+              fi
             done
           fi
 
-          echo "All assets uploaded successfully"
+          echo "Asset upload completed"
         env:
           GH_TOKEN: ${{ github.token }}
 
