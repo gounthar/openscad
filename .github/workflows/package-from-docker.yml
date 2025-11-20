@@ -27,8 +27,6 @@ on:
 
 env:
   DOCKER_IMAGE: ghcr.io/gounthar/openscad
-  PACKAGE_VERSION: 2025.11.19
-  PACKAGE_REVISION: 1
 
 jobs:
   package-amd64:
@@ -39,6 +37,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION=$(date +%Y.%m.%d).${GITHUB_RUN_NUMBER}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Package version: ${VERSION}"
 
       - name: Set up Docker
         run: |
@@ -80,9 +85,9 @@ jobs:
       - name: Create Debian package structure
         run: |
           PKG_NAME="openscad"
-          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_VERSION="${{ steps.version.outputs.version }}"
           PKG_ARCH="amd64"
-          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-1_${PKG_ARCH}"
 
           mkdir -p ${PKG_DIR}/DEBIAN
           mkdir -p ${PKG_DIR}/usr/bin
@@ -108,7 +113,7 @@ jobs:
           # Create control file
           cat > ${PKG_DIR}/DEBIAN/control << EOF
           Package: openscad
-          Version: ${PKG_VERSION}-${{ env.PACKAGE_REVISION }}
+          Version: ${PKG_VERSION}-1
           Section: graphics
           Priority: optional
           Architecture: ${PKG_ARCH}
@@ -134,9 +139,9 @@ jobs:
       - name: Build Debian package
         run: |
           PKG_NAME="openscad"
-          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_VERSION="${{ steps.version.outputs.version }}"
           PKG_ARCH="amd64"
-          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-1_${PKG_ARCH}"
 
           # Build the package
           dpkg-deb --build ${PKG_DIR}
@@ -161,6 +166,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION=$(date +%Y.%m.%d).${GITHUB_RUN_NUMBER}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Package version: ${VERSION}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -191,9 +203,9 @@ jobs:
       - name: Create Debian package structure
         run: |
           PKG_NAME="openscad"
-          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_VERSION="${{ steps.version.outputs.version }}"
           PKG_ARCH="arm64"
-          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-1_${PKG_ARCH}"
 
           mkdir -p ${PKG_DIR}/DEBIAN
           mkdir -p ${PKG_DIR}/usr/bin
@@ -215,7 +227,7 @@ jobs:
 
           cat > ${PKG_DIR}/DEBIAN/control << EOF
           Package: openscad
-          Version: ${PKG_VERSION}-${{ env.PACKAGE_REVISION }}
+          Version: ${PKG_VERSION}-1
           Section: graphics
           Priority: optional
           Architecture: ${PKG_ARCH}
@@ -240,9 +252,9 @@ jobs:
       - name: Build Debian package
         run: |
           PKG_NAME="openscad"
-          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_VERSION="${{ steps.version.outputs.version }}"
           PKG_ARCH="arm64"
-          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-1_${PKG_ARCH}"
 
           dpkg-deb --build ${PKG_DIR}
           dpkg-deb --info ${PKG_DIR}.deb
@@ -262,6 +274,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION=$(date +%Y.%m.%d).${GITHUB_RUN_NUMBER}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Package version: ${VERSION}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -292,9 +311,9 @@ jobs:
       - name: Create Debian package structure
         run: |
           PKG_NAME="openscad"
-          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_VERSION="${{ steps.version.outputs.version }}"
           PKG_ARCH="riscv64"
-          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-1_${PKG_ARCH}"
 
           mkdir -p ${PKG_DIR}/DEBIAN
           mkdir -p ${PKG_DIR}/usr/bin
@@ -316,7 +335,7 @@ jobs:
 
           cat > ${PKG_DIR}/DEBIAN/control << EOF
           Package: openscad
-          Version: ${PKG_VERSION}-${{ env.PACKAGE_REVISION }}
+          Version: ${PKG_VERSION}-1
           Section: graphics
           Priority: optional
           Architecture: ${PKG_ARCH}
@@ -341,9 +360,9 @@ jobs:
       - name: Build Debian package
         run: |
           PKG_NAME="openscad"
-          PKG_VERSION="${{ env.PACKAGE_VERSION }}"
+          PKG_VERSION="${{ steps.version.outputs.version }}"
           PKG_ARCH="riscv64"
-          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-${{ env.PACKAGE_REVISION }}_${PKG_ARCH}"
+          PKG_DIR="${PKG_NAME}_${PKG_VERSION}-1_${PKG_ARCH}"
 
           dpkg-deb --build ${PKG_DIR}
           dpkg-deb --info ${PKG_DIR}.deb
