@@ -189,29 +189,39 @@ jobs:
           - Workflow run: ${{ steps.run.outputs.run_id }}
           EOF
 
-          # Create release with assets (both .deb and .rpm)
-          ASSETS=""
-          if ls release-assets/*.deb 1>/dev/null 2>&1; then
-            ASSETS="$ASSETS release-assets/*.deb"
-          fi
-          if ls release-assets/*.rpm 1>/dev/null 2>&1; then
-            ASSETS="$ASSETS release-assets/*.rpm"
-          fi
-
+          # Create release without assets first
           if [ "${PRERELEASE}" = "true" ]; then
             gh release create "${{ steps.version.outputs.tag }}" \
               --title "OpenSCAD ${{ steps.version.outputs.version }}" \
               --notes-file release-notes.md \
-              --prerelease \
-              $ASSETS
+              --prerelease
           else
             gh release create "${{ steps.version.outputs.tag }}" \
               --title "OpenSCAD ${{ steps.version.outputs.version }}" \
-              --notes-file release-notes.md \
-              $ASSETS
+              --notes-file release-notes.md
           fi
 
           echo "Release created: ${{ steps.version.outputs.tag }}"
+
+          # Upload .deb packages
+          if ls release-assets/*.deb 1>/dev/null 2>&1; then
+            echo "Uploading Debian packages..."
+            for deb in release-assets/*.deb; do
+              echo "Uploading $(basename $deb)..."
+              gh release upload "${{ steps.version.outputs.tag }}" "$deb"
+            done
+          fi
+
+          # Upload .rpm packages
+          if ls release-assets/*.rpm 1>/dev/null 2>&1; then
+            echo "Uploading RPM packages..."
+            for rpm in release-assets/*.rpm; do
+              echo "Uploading $(basename $rpm)..."
+              gh release upload "${{ steps.version.outputs.tag }}" "$rpm"
+            done
+          fi
+
+          echo "All assets uploaded successfully"
         env:
           GH_TOKEN: ${{ github.token }}
 
