@@ -1,0 +1,304 @@
+name: Cleanup Old Repository Packages
+
+on:
+  schedule:
+    # Run weekly on Sundays at 1 AM UTC (after release cleanup)
+    - cron: '0 1 * * 0'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Delete packages older than N days'
+        type: number
+        default: 7
+      dry_run:
+        description: 'Dry run (list but do not delete)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  GPG_KEY_ID: '56188341425B007407229B48FB1963FC3575A39D'
+
+jobs:
+  cleanup:
+    name: Cleanup Repository Packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: Determine retention period
+        id: config
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            DAYS="${{ inputs.days }}"
+            DRY_RUN="${{ inputs.dry_run }}"
+          else
+            DAYS="7"
+            DRY_RUN="false"
+          fi
+          echo "days=${DAYS}" >> $GITHUB_OUTPUT
+          echo "dry_run=${DRY_RUN}" >> $GITHUB_OUTPUT
+          CUTOFF_SECONDS=$(date -d "${DAYS} days ago" +%s)
+          echo "cutoff_seconds=${CUTOFF_SECONDS}" >> $GITHUB_OUTPUT
+          echo "cutoff_date=$(date -d "${DAYS} days ago" '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
+
+      - name: Find old Debian packages
+        id: find_deb
+        run: |
+          CUTOFF="${{ steps.config.outputs.cutoff_seconds }}"
+          echo "Finding .deb packages older than ${{ steps.config.outputs.days }} days..."
+
+          OLD_DEBS=""
+          if [ -d "pool/main" ]; then
+            while IFS= read -r -d '' file; do
+              FILE_TIME=$(stat -c %Y "$file")
+              if [ "$FILE_TIME" -lt "$CUTOFF" ]; then
+                OLD_DEBS="${OLD_DEBS}${file}"$'\n'
+              fi
+            done < <(find pool/main -name "*.deb" -type f -print0)
+          fi
+
+          if [ -z "$OLD_DEBS" ]; then
+            echo "No old .deb packages found."
+            echo "count=0" >> $GITHUB_OUTPUT
+          else
+            echo "Old .deb packages:"
+            echo "$OLD_DEBS"
+            echo "debs<<EOF" >> $GITHUB_OUTPUT
+            echo "$OLD_DEBS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            COUNT=$(echo "$OLD_DEBS" | grep -c "\.deb" || echo "0")
+            echo "count=${COUNT}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Find old RPM packages
+        id: find_rpm
+        run: |
+          CUTOFF="${{ steps.config.outputs.cutoff_seconds }}"
+          echo "Finding .rpm packages older than ${{ steps.config.outputs.days }} days..."
+
+          OLD_RPMS=""
+          if [ -d "rpm/fedora" ]; then
+            while IFS= read -r -d '' file; do
+              FILE_TIME=$(stat -c %Y "$file")
+              if [ "$FILE_TIME" -lt "$CUTOFF" ]; then
+                OLD_RPMS="${OLD_RPMS}${file}"$'\n'
+              fi
+            done < <(find rpm/fedora -name "*.rpm" -type f -print0)
+          fi
+
+          if [ -z "$OLD_RPMS" ]; then
+            echo "No old .rpm packages found."
+            echo "count=0" >> $GITHUB_OUTPUT
+          else
+            echo "Old .rpm packages:"
+            echo "$OLD_RPMS"
+            echo "rpms<<EOF" >> $GITHUB_OUTPUT
+            echo "$OLD_RPMS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            COUNT=$(echo "$OLD_RPMS" | grep -c "\.rpm" || echo "0")
+            echo "count=${COUNT}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Delete old Debian packages
+        if: steps.find_deb.outputs.count != '0' && steps.config.outputs.dry_run == 'false'
+        run: |
+          echo "Deleting ${{ steps.find_deb.outputs.count }} .deb packages..."
+          echo "${{ steps.find_deb.outputs.debs }}" | while read file; do
+            if [ -n "$file" ] && [ -f "$file" ]; then
+              echo "Deleting: $file"
+              rm -f "$file"
+            fi
+          done
+
+      - name: Delete old RPM packages
+        if: steps.find_rpm.outputs.count != '0' && steps.config.outputs.dry_run == 'false'
+        run: |
+          echo "Deleting ${{ steps.find_rpm.outputs.count }} .rpm packages..."
+          echo "${{ steps.find_rpm.outputs.rpms }}" | while read file; do
+            if [ -n "$file" ] && [ -f "$file" ]; then
+              echo "Deleting: $file"
+              rm -f "$file"
+            fi
+          done
+
+      - name: Install repository tools
+        if: (steps.find_deb.outputs.count != '0' || steps.find_rpm.outputs.count != '0') && steps.config.outputs.dry_run == 'false'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev createrepo-c gnupg
+
+      - name: Update APT repository metadata
+        if: steps.find_deb.outputs.count != '0' && steps.config.outputs.dry_run == 'false'
+        run: |
+          echo "Updating APT repository metadata..."
+
+          for arch in amd64 arm64 riscv64; do
+            DIST_DIR="dists/stable/main/binary-${arch}"
+
+            if [ ! -d "pool/main" ] || ! ls pool/main/*_${arch}.deb 1>/dev/null 2>&1; then
+              echo "No ${arch} packages found, skipping..."
+              continue
+            fi
+
+            echo "Generating Packages file for ${arch}..."
+            mkdir -p "${DIST_DIR}"
+
+            dpkg-scanpackages --arch ${arch} pool/main /dev/null > "${DIST_DIR}/Packages"
+            gzip -9c "${DIST_DIR}/Packages" > "${DIST_DIR}/Packages.gz"
+            xz -9c "${DIST_DIR}/Packages" > "${DIST_DIR}/Packages.xz"
+
+            echo "  ${arch}: $(grep -c '^Package:' ${DIST_DIR}/Packages) packages"
+          done
+
+          # Update Release file
+          if [ -f "dists/stable/Release" ]; then
+            cd dists/stable
+
+            # Regenerate Release file
+            cat > Release << 'EOF'
+          Origin: gounthar
+          Label: OpenSCAD Multi-Arch
+          Suite: stable
+          Codename: stable
+          Architectures: amd64 arm64 riscv64
+          Components: main
+          Description: OpenSCAD packages for multiple architectures
+          Date: $(date -R -u)
+          EOF
+
+            # Add file hashes
+            apt-ftparchive release . >> Release.tmp
+            mv Release.tmp Release
+
+            cd ../..
+          fi
+
+      - name: Import GPG key for RPM signing
+        if: steps.find_rpm.outputs.count != '0' && steps.config.outputs.dry_run == 'false'
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          if [ -n "$GPG_PRIVATE_KEY" ]; then
+            echo "Importing GPG key..."
+            echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+            gpg --list-secret-keys
+            echo "signed=true" >> $GITHUB_OUTPUT
+          else
+            echo "No GPG key available, repository will not be signed"
+            echo "signed=false" >> $GITHUB_OUTPUT
+          fi
+        id: gpg
+
+      - name: Update RPM repository metadata
+        if: steps.find_rpm.outputs.count != '0' && steps.config.outputs.dry_run == 'false'
+        run: |
+          echo "Updating RPM repository metadata..."
+
+          for arch in x86_64 aarch64 riscv64; do
+            ARCH_DIR="rpm/fedora/${arch}"
+
+            if [ ! -d "${ARCH_DIR}" ] || ! ls ${ARCH_DIR}/*.rpm 1>/dev/null 2>&1; then
+              echo "No ${arch} packages found, skipping..."
+              continue
+            fi
+
+            echo "Updating repository metadata for ${arch}..."
+
+            if ! createrepo_c --update "${ARCH_DIR}"; then
+              echo "Error: Failed to update repository metadata for ${arch}"
+              exit 1
+            fi
+
+            # Sign repository metadata if GPG key available
+            if [ "${{ steps.gpg.outputs.signed }}" = "true" ] && [ -f "${ARCH_DIR}/repodata/repomd.xml" ]; then
+              echo "Signing repository metadata for ${arch}..."
+              if ! gpg --batch --yes --detach-sign --armor "${ARCH_DIR}/repodata/repomd.xml"; then
+                echo "Error: Failed to sign repository metadata for ${arch}"
+                exit 1
+              fi
+            fi
+
+            PKG_COUNT=$(ls -1 ${ARCH_DIR}/*.rpm 2>/dev/null | wc -l)
+            echo "  ${arch}: ${PKG_COUNT} packages"
+          done
+
+      - name: Commit and push changes
+        if: (steps.find_deb.outputs.count != '0' || steps.find_rpm.outputs.count != '0') && steps.config.outputs.dry_run == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            TOTAL_DELETED=$(( ${{ steps.find_deb.outputs.count }} + ${{ steps.find_rpm.outputs.count }} ))
+            git commit -m "chore: cleanup old packages (${TOTAL_DELETED} packages removed)
+
+Automated cleanup from workflow run ${{ github.run_id }}
+- Removed .deb packages older than ${{ steps.config.outputs.days }} days
+- Removed .rpm packages older than ${{ steps.config.outputs.days }} days
+- Updated repository metadata"
+
+            git push origin gh-pages
+            echo "Changes committed and pushed successfully"
+          fi
+
+      - name: Dry run summary
+        if: (steps.find_deb.outputs.count != '0' || steps.find_rpm.outputs.count != '0') && steps.config.outputs.dry_run == 'true'
+        run: |
+          echo "DRY RUN - Would delete the following packages:"
+          echo ""
+          if [ "${{ steps.find_deb.outputs.count }}" != "0" ]; then
+            echo "=== Debian Packages ==="
+            echo "${{ steps.find_deb.outputs.debs }}"
+            echo ""
+          fi
+          if [ "${{ steps.find_rpm.outputs.count }}" != "0" ]; then
+            echo "=== RPM Packages ==="
+            echo "${{ steps.find_rpm.outputs.rpms }}"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Repository Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Retention period:** ${{ steps.config.outputs.days }} days" >> $GITHUB_STEP_SUMMARY
+          echo "**Cutoff date:** ${{ steps.config.outputs.cutoff_date }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry run:** ${{ steps.config.outputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.find_deb.outputs.count }}" = "0" ] && [ "${{ steps.find_rpm.outputs.count }}" = "0" ]; then
+            echo "No packages older than ${{ steps.config.outputs.days }} days found." >> $GITHUB_STEP_SUMMARY
+          else
+            if [ "${{ steps.config.outputs.dry_run }}" = "true" ]; then
+              echo "### Packages to be deleted" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "### Packages deleted" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            if [ "${{ steps.find_deb.outputs.count }}" != "0" ]; then
+              echo "**Debian packages:** ${{ steps.find_deb.outputs.count }}" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "${{ steps.find_deb.outputs.debs }}" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            if [ "${{ steps.find_rpm.outputs.count }}" != "0" ]; then
+              echo "**RPM packages:** ${{ steps.find_rpm.outputs.count }}" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "${{ steps.find_rpm.outputs.rpms }}" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            fi
+          fi

@@ -9,7 +9,7 @@ on:
       days:
         description: 'Delete releases older than N days'
         type: number
-        default: 30
+        default: 7
       dry_run:
         description: 'Dry run (list but do not delete)'
         type: boolean
@@ -34,7 +34,7 @@ jobs:
             DAYS="${{ inputs.days }}"
             DRY_RUN="${{ inputs.dry_run }}"
           else
-            DAYS="30"
+            DAYS="7"
             DRY_RUN="false"
           fi
           echo "days=${DAYS}" >> $GITHUB_OUTPUT
