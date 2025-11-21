@@ -12,7 +12,7 @@ on:
         type: boolean
         default: true
       run_id:
-        description: 'Workflow run ID to download artifacts from (leave empty for latest)'
+        description: 'DEPRECATED: This parameter is no longer used. The workflow now automatically fetches the latest successful runs from both packaging workflows to ensure synchronization.'
         type: string
         required: false
   workflow_run:
@@ -51,48 +51,135 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Determine workflow run ID
-        id: run
+      - name: Find both workflow runs
+        id: runs
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Check for deprecated run_id parameter usage
             if [ -n "${{ inputs.run_id }}" ]; then
-              echo "run_id=${{ inputs.run_id }}" >> $GITHUB_OUTPUT
-            else
-              # Get the latest successful packaging workflow run
-              RUN_ID=$(gh run list --workflow=package-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
-              echo "run_id=${RUN_ID}" >> $GITHUB_OUTPUT
+              echo "::warning::The 'run_id' parameter is deprecated and will be ignored. The workflow now automatically fetches the latest successful runs from both packaging workflows."
             fi
+
+            # Manual trigger - get both latest runs
+            DEB_RUN=$(gh run list --workflow=package-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+            if [ -z "$DEB_RUN" ] || [ "$DEB_RUN" = "null" ]; then
+              echo "::error::No successful Debian packaging workflow runs found"
+              exit 1
+            fi
+
+            RPM_RUN=$(gh run list --workflow=package-rpm-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+            if [ -z "$RPM_RUN" ] || [ "$RPM_RUN" = "null" ]; then
+              echo "::error::No successful RPM packaging workflow runs found"
+              exit 1
+            fi
+
+            echo "deb_run_id=${DEB_RUN}" >> $GITHUB_OUTPUT
+            echo "rpm_run_id=${RPM_RUN}" >> $GITHUB_OUTPUT
+            echo "should_create_release=true" >> $GITHUB_OUTPUT
           else
-            echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
+            # Triggered by workflow_run - determine which workflow triggered us
+            TRIGGER_WORKFLOW="${{ github.event.workflow_run.name }}"
+            TRIGGER_RUN_ID="${{ github.event.workflow_run.id }}"
+
+            echo "Triggered by: ${TRIGGER_WORKFLOW} (run ${TRIGGER_RUN_ID})"
+
+            # Find the other workflow's latest successful run
+            if [ "${TRIGGER_WORKFLOW}" = "Package from Docker Image" ]; then
+              DEB_RUN="${TRIGGER_RUN_ID}"
+              RPM_RUN=$(gh run list --workflow=package-rpm-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+              if [ -z "$RPM_RUN" ] || [ "$RPM_RUN" = "null" ]; then
+                echo "::error::No successful RPM packaging workflow runs found"
+                exit 1
+              fi
+            else
+              RPM_RUN="${TRIGGER_RUN_ID}"
+              DEB_RUN=$(gh run list --workflow=package-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+              if [ -z "$DEB_RUN" ] || [ "$DEB_RUN" = "null" ]; then
+                echo "::error::No successful Debian packaging workflow runs found"
+                exit 1
+              fi
+            fi
+
+            echo "Debian workflow run: ${DEB_RUN}"
+            echo "RPM workflow run: ${RPM_RUN}"
+
+            # Check if both runs are from the same Docker build
+            # Get creation timestamps for both workflows
+            DEB_TIME=$(gh api repos/${{ github.repository }}/actions/runs/${DEB_RUN} --jq '.created_at')
+            if [ -z "$DEB_TIME" ] || [ "$DEB_TIME" = "null" ]; then
+              echo "::error::Failed to get creation time for Debian workflow run ${DEB_RUN}"
+              exit 1
+            fi
+
+            RPM_TIME=$(gh api repos/${{ github.repository }}/actions/runs/${RPM_RUN} --jq '.created_at')
+            if [ -z "$RPM_TIME" ] || [ "$RPM_TIME" = "null" ]; then
+              echo "::error::Failed to get creation time for RPM workflow run ${RPM_RUN}"
+              exit 1
+            fi
+
+            echo "Debian run created: ${DEB_TIME}"
+            echo "RPM run created: ${RPM_TIME}"
+
+            # Synchronization window: workflows must start within this many seconds to be from the same build
+            SYNC_WINDOW_SECONDS=300  # 5 minutes
+
+            # Check if both workflows were created within the sync window
+            # This indicates they were triggered by the same Docker build
+            DEB_TIMESTAMP=$(date -d "${DEB_TIME}" +%s)
+            RPM_TIMESTAMP=$(date -d "${RPM_TIME}" +%s)
+            TIME_DIFF=$((DEB_TIMESTAMP - RPM_TIMESTAMP))
+            TIME_DIFF=${TIME_DIFF#-}  # absolute value
+
+            if [ ${TIME_DIFF} -lt ${SYNC_WINDOW_SECONDS} ]; then
+              echo "Both workflows completed from the same Docker build (within ${SYNC_WINDOW_SECONDS}s)"
+              echo "should_create_release=true" >> $GITHUB_OUTPUT
+            else
+              echo "Workflows are from different Docker builds (${TIME_DIFF}s apart, threshold: ${SYNC_WINDOW_SECONDS}s)"
+              echo "Waiting for the other workflow to complete..."
+              echo "should_create_release=false" >> $GITHUB_OUTPUT
+            fi
+
+            echo "deb_run_id=${DEB_RUN}" >> $GITHUB_OUTPUT
+            echo "rpm_run_id=${RPM_RUN}" >> $GITHUB_OUTPUT
           fi
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Check if run has artifacts
-        id: check_artifacts
-        uses: ./.github/actions/check-run-artifacts
-        with:
-          run_id: ${{ steps.run.outputs.run_id }}
-          github_token: ${{ github.token }}
-
-      - name: Download artifacts from packaging workflow
-        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+      - name: Skip release creation if both workflows not ready
+        if: steps.runs.outputs.should_create_release == 'false'
         run: |
-          mkdir -p packages
+          echo "⏸️ Skipping release creation - waiting for both packaging workflows to complete"
+          echo "This is expected behavior when workflows complete at different times."
+          exit 0
 
-          echo "Downloading artifacts from run ${{ steps.run.outputs.run_id }}..."
+      - name: Download artifacts from Debian packaging workflow
+        if: steps.runs.outputs.should_create_release == 'true'
+        run: |
+          mkdir -p packages/debian
 
-          # Download all artifacts from the packaging workflow
-          gh run download ${{ steps.run.outputs.run_id }} --dir packages
+          echo "Downloading Debian packages from run ${{ steps.runs.outputs.deb_run_id }}..."
+          gh run download ${{ steps.runs.outputs.deb_run_id }} --dir packages/debian
 
-          # List downloaded files
-          echo "Downloaded packages:"
-          find packages -name "*.deb" -o -name "*.rpm" -type f
+          echo "Downloaded Debian packages:"
+          find packages/debian -name "*.deb" -type f
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download artifacts from RPM packaging workflow
+        if: steps.runs.outputs.should_create_release == 'true'
+        run: |
+          mkdir -p packages/rpm
+
+          echo "Downloading RPM packages from run ${{ steps.runs.outputs.rpm_run_id }}..."
+          gh run download ${{ steps.runs.outputs.rpm_run_id }} --dir packages/rpm
+
+          echo "Downloaded RPM packages:"
+          find packages/rpm -name "*.rpm" -type f
         env:
           GH_TOKEN: ${{ github.token }}
 
       - name: Prepare release assets
-        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        if: steps.runs.outputs.should_create_release == 'true'
         id: assets
         run: |
           mkdir -p release-assets
@@ -116,14 +203,15 @@ jobs:
           fi
           COUNT=$((DEB_COUNT + RPM_COUNT))
           if [ "$COUNT" -eq 0 ]; then
-            echo "Warning: No packages found in release-assets"
+            echo "Error: No packages found in release-assets"
+            exit 1
           fi
           echo "count=${COUNT}" >> $GITHUB_OUTPUT
           echo "deb_count=${DEB_COUNT}" >> $GITHUB_OUTPUT
           echo "rpm_count=${RPM_COUNT}" >> $GITHUB_OUTPUT
 
       - name: Check if release already exists
-        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        if: steps.runs.outputs.should_create_release == 'true'
         id: check
         run: |
           if gh release view "${{ steps.version.outputs.tag }}" &>/dev/null; then
@@ -135,7 +223,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Delete existing release if needed
-        if: steps.check_artifacts.outputs.has_artifacts == 'true' && steps.check.outputs.exists == 'true'
+        if: steps.runs.outputs.should_create_release == 'true' && steps.check.outputs.exists == 'true'
         run: |
           echo "Deleting existing release ${{ steps.version.outputs.tag }}..."
           gh release delete "${{ steps.version.outputs.tag }}" --yes --cleanup-tag
@@ -143,7 +231,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create GitHub Release
-        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        if: steps.runs.outputs.should_create_release == 'true'
         run: |
           # Determine if prerelease
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -190,7 +278,8 @@ jobs:
 
           ### Build Information
           - Built from commit: ${{ github.sha }}
-          - Workflow run: ${{ steps.run.outputs.run_id }}
+          - Debian packages from run: ${{ steps.runs.outputs.deb_run_id }}
+          - RPM packages from run: ${{ steps.runs.outputs.rpm_run_id }}
           EOF
 
           # Create release without assets first
@@ -242,31 +331,44 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Summary
-        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        if: always()
         run: |
-          echo "## Release Created" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Tag:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Packages:** ${{ steps.assets.outputs.count }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Assets" >> $GITHUB_STEP_SUMMARY
-          if ls release-assets/*.deb 1>/dev/null 2>&1; then
-            echo "#### Debian Packages" >> $GITHUB_STEP_SUMMARY
-            ls release-assets/*.deb | while read pkg; do
-              name=$(basename "$pkg")
-              size=$(du -h "$pkg" | cut -f1)
-              echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
-            done
-          fi
-          if ls release-assets/*.rpm 1>/dev/null 2>&1; then
-            echo "#### RPM Packages" >> $GITHUB_STEP_SUMMARY
-            ls release-assets/*.rpm | while read pkg; do
-              name=$(basename "$pkg")
-              size=$(du -h "$pkg" | cut -f1)
-              echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
-            done
-          fi
-          if [ "${{ steps.assets.outputs.count }}" = "0" ]; then
-            echo "No packages found" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.runs.outputs.should_create_release }}" = "true" ]; then
+            echo "## Release Created" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Tag:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+
+            # Only display package count if asset preparation succeeded
+            if [ "${{ steps.assets.outcome }}" = "success" ]; then
+              echo "**Packages:** ${{ steps.assets.outputs.count }}" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "**Packages:** Asset preparation failed - check job logs for details" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "**Debian packages from run:** ${{ steps.runs.outputs.deb_run_id }}" >> $GITHUB_STEP_SUMMARY
+            echo "**RPM packages from run:** ${{ steps.runs.outputs.rpm_run_id }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Assets" >> $GITHUB_STEP_SUMMARY
+            if ls release-assets/*.deb 1>/dev/null 2>&1; then
+              echo "#### Debian Packages" >> $GITHUB_STEP_SUMMARY
+              ls release-assets/*.deb | while read pkg; do
+                name=$(basename "$pkg")
+                size=$(du -h "$pkg" | cut -f1)
+                echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
+              done
+            fi
+            if ls release-assets/*.rpm 1>/dev/null 2>&1; then
+              echo "#### RPM Packages" >> $GITHUB_STEP_SUMMARY
+              ls release-assets/*.rpm | while read pkg; do
+                name=$(basename "$pkg")
+                size=$(du -h "$pkg" | cut -f1)
+                echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
+              done
+            fi
+          else
+            echo "## Release Creation Skipped" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Waiting for both packaging workflows to complete." >> $GITHUB_STEP_SUMMARY
+            echo "The release will be created when both workflows finish." >> $GITHUB_STEP_SUMMARY
           fi
