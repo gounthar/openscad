@@ -307,7 +307,7 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          if [ "${{ steps.runs.outputs.should_create_release }}" = "true" ]; then
+          if [ "${{ steps.runs.outputs.should_create_release }}" = "true" ] && [ "${{ steps.assets.outcome }}" = "success" ]; then
             echo "## Release Created" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
