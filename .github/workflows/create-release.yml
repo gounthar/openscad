@@ -62,7 +62,16 @@ jobs:
 
             # Manual trigger - get both latest runs
             DEB_RUN=$(gh run list --workflow=package-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+            if [ -z "$DEB_RUN" ] || [ "$DEB_RUN" = "null" ]; then
+              echo "::error::No successful Debian packaging workflow runs found"
+              exit 1
+            fi
+
             RPM_RUN=$(gh run list --workflow=package-rpm-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+            if [ -z "$RPM_RUN" ] || [ "$RPM_RUN" = "null" ]; then
+              echo "::error::No successful RPM packaging workflow runs found"
+              exit 1
+            fi
 
             echo "deb_run_id=${DEB_RUN}" >> $GITHUB_OUTPUT
             echo "rpm_run_id=${RPM_RUN}" >> $GITHUB_OUTPUT
@@ -78,9 +87,17 @@ jobs:
             if [ "${TRIGGER_WORKFLOW}" = "Package from Docker Image" ]; then
               DEB_RUN="${TRIGGER_RUN_ID}"
               RPM_RUN=$(gh run list --workflow=package-rpm-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+              if [ -z "$RPM_RUN" ] || [ "$RPM_RUN" = "null" ]; then
+                echo "::error::No successful RPM packaging workflow runs found"
+                exit 1
+              fi
             else
               RPM_RUN="${TRIGGER_RUN_ID}"
               DEB_RUN=$(gh run list --workflow=package-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+              if [ -z "$DEB_RUN" ] || [ "$DEB_RUN" = "null" ]; then
+                echo "::error::No successful Debian packaging workflow runs found"
+                exit 1
+              fi
             fi
 
             echo "Debian workflow run: ${DEB_RUN}"
@@ -89,7 +106,16 @@ jobs:
             # Check if both runs are from the same Docker build
             # Get creation timestamps for both workflows
             DEB_TIME=$(gh api repos/${{ github.repository }}/actions/runs/${DEB_RUN} --jq '.created_at')
+            if [ -z "$DEB_TIME" ] || [ "$DEB_TIME" = "null" ]; then
+              echo "::error::Failed to get creation time for Debian workflow run ${DEB_RUN}"
+              exit 1
+            fi
+
             RPM_TIME=$(gh api repos/${{ github.repository }}/actions/runs/${RPM_RUN} --jq '.created_at')
+            if [ -z "$RPM_TIME" ] || [ "$RPM_TIME" = "null" ]; then
+              echo "::error::Failed to get creation time for RPM workflow run ${RPM_RUN}"
+              exit 1
+            fi
 
             echo "Debian run created: ${DEB_TIME}"
             echo "RPM run created: ${RPM_TIME}"
@@ -312,7 +338,14 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
             echo "**Tag:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Packages:** ${{ steps.assets.outputs.count }}" >> $GITHUB_STEP_SUMMARY
+
+            # Only display package count if asset preparation succeeded
+            if [ "${{ steps.assets.outcome }}" = "success" ]; then
+              echo "**Packages:** ${{ steps.assets.outputs.count }}" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "**Packages:** Asset preparation failed - check job logs for details" >> $GITHUB_STEP_SUMMARY
+            fi
+
             echo "**Debian packages from run:** ${{ steps.runs.outputs.deb_run_id }}" >> $GITHUB_STEP_SUMMARY
             echo "**RPM packages from run:** ${{ steps.runs.outputs.rpm_run_id }}" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
