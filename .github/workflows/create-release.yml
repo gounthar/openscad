@@ -206,7 +206,7 @@ jobs:
           echo "deb_count=${DEB_COUNT}" >> $GITHUB_OUTPUT
           echo "rpm_count=${RPM_COUNT}" >> $GITHUB_OUTPUT
 
-      - name: Check if release already exists
+      - name: Check if release exists before deletion
         if: steps.runs.outputs.should_create_release == 'true' && steps.early_check.outputs.exists != 'true'
         id: check
         run: |
