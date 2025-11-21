@@ -126,8 +126,30 @@ jobs:
           echo "This is expected behavior when workflows complete at different times."
           exit 0
 
-      - name: Download artifacts from Debian packaging workflow
+      - name: Check if release already exists (early check)
         if: steps.runs.outputs.should_create_release == 'true'
+        id: early_check
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" &>/dev/null; then
+            echo "Release ${{ steps.version.outputs.tag }} already exists"
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Exiting gracefully to avoid unnecessary work"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Skip if release already exists
+        if: steps.runs.outputs.should_create_release == 'true' && steps.early_check.outputs.exists == 'true'
+        run: |
+          echo "✅ Release ${{ steps.version.outputs.tag }} already exists"
+          echo "Skipping artifact download and release creation to avoid unnecessary work."
+          echo "This is expected when both packaging workflows trigger release creation nearly simultaneously."
+          exit 0
+
+      - name: Download artifacts from Debian packaging workflow
+        if: steps.runs.outputs.should_create_release == 'true' && steps.early_check.outputs.exists != 'true'
         run: |
           mkdir -p packages/debian
 
@@ -140,7 +162,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Download artifacts from RPM packaging workflow
-        if: steps.runs.outputs.should_create_release == 'true'
+        if: steps.runs.outputs.should_create_release == 'true' && steps.early_check.outputs.exists != 'true'
         run: |
           mkdir -p packages/rpm
 
@@ -153,7 +175,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Prepare release assets
-        if: steps.runs.outputs.should_create_release == 'true'
+        if: steps.runs.outputs.should_create_release == 'true' && steps.early_check.outputs.exists != 'true'
         id: assets
         run: |
           mkdir -p release-assets
@@ -185,7 +207,7 @@ jobs:
           echo "rpm_count=${RPM_COUNT}" >> $GITHUB_OUTPUT
 
       - name: Check if release already exists
-        if: steps.runs.outputs.should_create_release == 'true'
+        if: steps.runs.outputs.should_create_release == 'true' && steps.early_check.outputs.exists != 'true'
         id: check
         run: |
           if gh release view "${{ steps.version.outputs.tag }}" &>/dev/null; then
@@ -197,7 +219,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Delete existing release if needed
-        if: steps.runs.outputs.should_create_release == 'true' && steps.check.outputs.exists == 'true'
+        if: steps.runs.outputs.should_create_release == 'true' && steps.early_check.outputs.exists != 'true' && steps.check.outputs.exists == 'true'
         run: |
           echo "Deleting existing release ${{ steps.version.outputs.tag }}..."
           gh release delete "${{ steps.version.outputs.tag }}" --yes --cleanup-tag
@@ -205,7 +227,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create GitHub Release
-        if: steps.runs.outputs.should_create_release == 'true'
+        if: steps.runs.outputs.should_create_release == 'true' && steps.early_check.outputs.exists != 'true'
         run: |
           # Determine if prerelease
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -308,30 +330,40 @@ jobs:
         if: always()
         run: |
           if [ "${{ steps.runs.outputs.should_create_release }}" = "true" ]; then
-            echo "## Release Created" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Tag:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Packages:** ${{ steps.assets.outputs.count }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Debian packages from run:** ${{ steps.runs.outputs.deb_run_id }}" >> $GITHUB_STEP_SUMMARY
-            echo "**RPM packages from run:** ${{ steps.runs.outputs.rpm_run_id }}" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Assets" >> $GITHUB_STEP_SUMMARY
-            if ls release-assets/*.deb 1>/dev/null 2>&1; then
-              echo "#### Debian Packages" >> $GITHUB_STEP_SUMMARY
-              ls release-assets/*.deb | while read pkg; do
-                name=$(basename "$pkg")
-                size=$(du -h "$pkg" | cut -f1)
-                echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
-              done
-            fi
-            if ls release-assets/*.rpm 1>/dev/null 2>&1; then
-              echo "#### RPM Packages" >> $GITHUB_STEP_SUMMARY
-              ls release-assets/*.rpm | while read pkg; do
-                name=$(basename "$pkg")
-                size=$(du -h "$pkg" | cut -f1)
-                echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
-              done
+            if [ "${{ steps.early_check.outputs.exists }}" = "true" ]; then
+              echo "## Release Already Exists" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+              echo "**Tag:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "The release already exists. Skipped artifact download and release creation." >> $GITHUB_STEP_SUMMARY
+              echo "This is expected behavior when both packaging workflows trigger release creation nearly simultaneously." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "## Release Created" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+              echo "**Tag:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+              echo "**Packages:** ${{ steps.assets.outputs.count }}" >> $GITHUB_STEP_SUMMARY
+              echo "**Debian packages from run:** ${{ steps.runs.outputs.deb_run_id }}" >> $GITHUB_STEP_SUMMARY
+              echo "**RPM packages from run:** ${{ steps.runs.outputs.rpm_run_id }}" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Assets" >> $GITHUB_STEP_SUMMARY
+              if ls release-assets/*.deb 1>/dev/null 2>&1; then
+                echo "#### Debian Packages" >> $GITHUB_STEP_SUMMARY
+                ls release-assets/*.deb | while read pkg; do
+                  name=$(basename "$pkg")
+                  size=$(du -h "$pkg" | cut -f1)
+                  echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
+                done
+              fi
+              if ls release-assets/*.rpm 1>/dev/null 2>&1; then
+                echo "#### RPM Packages" >> $GITHUB_STEP_SUMMARY
+                ls release-assets/*.rpm | while read pkg; do
+                  name=$(basename "$pkg")
+                  size=$(du -h "$pkg" | cut -f1)
+                  echo "- **${name}** (${size})" >> $GITHUB_STEP_SUMMARY
+                done
+              fi
             fi
           else
             echo "## Release Creation Skipped" >> $GITHUB_STEP_SUMMARY
