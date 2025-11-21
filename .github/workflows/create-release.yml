@@ -12,7 +12,7 @@ on:
         type: boolean
         default: true
       run_id:
-        description: 'Workflow run ID to download artifacts from (leave empty for latest)'
+        description: 'DEPRECATED: This parameter is no longer used. The workflow now automatically fetches the latest successful runs from both packaging workflows to ensure synchronization.'
         type: string
         required: false
   workflow_run:
@@ -89,10 +89,7 @@ jobs:
             echo "RPM workflow run: ${RPM_RUN}"
 
             # Check if both runs are from the same Docker build
-            # Get the triggering Docker build run ID for both workflows
-            DEB_TRIGGER=$(gh api repos/${{ github.repository }}/actions/runs/${DEB_RUN} --jq '.triggering_actor.login,.created_at')
-            RPM_TRIGGER=$(gh api repos/${{ github.repository }}/actions/runs/${RPM_RUN} --jq '.triggering_actor.login,.created_at')
-
+            # Get creation timestamps for both workflows
             DEB_TIME=$(gh api repos/${{ github.repository }}/actions/runs/${DEB_RUN} --jq '.created_at')
             RPM_TIME=$(gh api repos/${{ github.repository }}/actions/runs/${RPM_RUN} --jq '.created_at')
 
