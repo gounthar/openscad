@@ -55,15 +55,15 @@ jobs:
         id: runs
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Check for deprecated run_id parameter usage
             if [ -n "${{ inputs.run_id }}" ]; then
-              # Manual trigger with specific run ID - get both latest runs
-              DEB_RUN=$(gh run list --workflow=package-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
-              RPM_RUN=$(gh run list --workflow=package-rpm-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
-            else
-              # Manual trigger without run ID - get both latest runs
-              DEB_RUN=$(gh run list --workflow=package-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
-              RPM_RUN=$(gh run list --workflow=package-rpm-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+              echo "::warning::The 'run_id' parameter is deprecated and will be ignored. The workflow now automatically fetches the latest successful runs from both packaging workflows."
             fi
+
+            # Manual trigger - get both latest runs
+            DEB_RUN=$(gh run list --workflow=package-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+            RPM_RUN=$(gh run list --workflow=package-rpm-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
+
             echo "deb_run_id=${DEB_RUN}" >> $GITHUB_OUTPUT
             echo "rpm_run_id=${RPM_RUN}" >> $GITHUB_OUTPUT
             echo "should_create_release=true" >> $GITHUB_OUTPUT
@@ -78,11 +78,9 @@ jobs:
             if [ "${TRIGGER_WORKFLOW}" = "Package from Docker Image" ]; then
               DEB_RUN="${TRIGGER_RUN_ID}"
               RPM_RUN=$(gh run list --workflow=package-rpm-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
-              OTHER_WORKFLOW="Package RPM from Docker Image"
             else
               RPM_RUN="${TRIGGER_RUN_ID}"
               DEB_RUN=$(gh run list --workflow=package-from-docker.yml --status=success --limit=1 --json databaseId --jq '.[0].databaseId')
-              OTHER_WORKFLOW="Package from Docker Image"
             fi
 
             echo "Debian workflow run: ${DEB_RUN}"
@@ -96,18 +94,21 @@ jobs:
             echo "Debian run created: ${DEB_TIME}"
             echo "RPM run created: ${RPM_TIME}"
 
-            # Check if both workflows were created within 5 minutes of each other
+            # Synchronization window: workflows must start within this many seconds to be from the same build
+            SYNC_WINDOW_SECONDS=300  # 5 minutes
+
+            # Check if both workflows were created within the sync window
             # This indicates they were triggered by the same Docker build
             DEB_TIMESTAMP=$(date -d "${DEB_TIME}" +%s)
             RPM_TIMESTAMP=$(date -d "${RPM_TIME}" +%s)
             TIME_DIFF=$((DEB_TIMESTAMP - RPM_TIMESTAMP))
             TIME_DIFF=${TIME_DIFF#-}  # absolute value
 
-            if [ ${TIME_DIFF} -lt 300 ]; then
-              echo "Both workflows completed from the same Docker build (within 5 minutes)"
+            if [ ${TIME_DIFF} -lt ${SYNC_WINDOW_SECONDS} ]; then
+              echo "Both workflows completed from the same Docker build (within ${SYNC_WINDOW_SECONDS}s)"
               echo "should_create_release=true" >> $GITHUB_OUTPUT
             else
-              echo "Workflows are from different Docker builds (${TIME_DIFF}s apart)"
+              echo "Workflows are from different Docker builds (${TIME_DIFF}s apart, threshold: ${SYNC_WINDOW_SECONDS}s)"
               echo "Waiting for the other workflow to complete..."
               echo "should_create_release=false" >> $GITHUB_OUTPUT
             fi
