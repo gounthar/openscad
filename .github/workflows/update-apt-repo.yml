@@ -33,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout repository for composite action
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Determine workflow run ID
         id: run
@@ -60,7 +60,7 @@ jobs:
 
       - name: Checkout gh-pages branch
         if: steps.check_artifacts.outputs.has_artifacts == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: gh-pages
           fetch-depth: 0
