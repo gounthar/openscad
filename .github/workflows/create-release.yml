@@ -282,6 +282,16 @@ jobs:
           - RPM packages from run: ${{ steps.runs.outputs.rpm_run_id }}
           EOF
 
+          # Extract and append OPENSCAD_COMMIT from Dockerfile for change detection
+          OPENSCAD_COMMIT=$(grep "ARG OPENSCAD_COMMIT=" docker/Dockerfile | sed 's/ARG OPENSCAD_COMMIT=//')
+          cat >> release-notes.md << EOF
+
+          ### Upstream OpenSCAD
+          - **OPENSCAD_COMMIT=${OPENSCAD_COMMIT}**
+          - Upstream repository: https://github.com/openscad/openscad
+          - Commit details: https://github.com/openscad/openscad/commit/${OPENSCAD_COMMIT}
+          EOF
+
           # Create release without assets first
           if [ "${PRERELEASE}" = "true" ]; then
             gh release create "${{ steps.version.outputs.tag }}" \
