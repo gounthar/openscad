@@ -27,7 +27,7 @@ jobs:
           - linux/riscv64
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           submodules: recursive
 
