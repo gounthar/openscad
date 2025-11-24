@@ -28,7 +28,7 @@ targets:
     kind: file
     spec:
       file: docker/Dockerfile
-      matchpattern: 'ARG\s+OPENSCAD_COMMIT\s*=\s*[a-f0-9]{40}'
+      matchpattern: 'ARG\s+OPENSCAD_COMMIT\s*=\s*[a-fA-F0-9]{40}'
       replacepattern: 'ARG OPENSCAD_COMMIT={{ source "openscad-latest-commit" }}'
     scmid: default
 
