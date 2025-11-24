@@ -54,6 +54,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+      - name: Log change detection result
+        run: |
+          echo "## 🔍 Change Detection Result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Current commit:** \`${{ steps.check.outputs.current_commit }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Last release commit:** \`${{ steps.check.outputs.last_commit }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check.outputs.should_build }}" = "true" ]; then
+            echo "**Decision:** ✅ **Build will proceed** - upstream has changes" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "[View commit diff](https://github.com/openscad/openscad/compare/${{ steps.check.outputs.last_commit }}...${{ steps.check.outputs.current_commit }})" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Decision:** ⏭️ **Build skipped** - no upstream changes detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "_The upstream OpenSCAD commit hasn't changed since the last release._" >> $GITHUB_STEP_SUMMARY
+            echo "_Next check: tomorrow at 2 AM UTC_" >> $GITHUB_STEP_SUMMARY
+          fi
+
   # Build each architecture in parallel
   build:
     runs-on: ubuntu-latest
