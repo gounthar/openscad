@@ -2,8 +2,8 @@ name: UpdateCLI
 
 on:
   schedule:
-    # Run weekly on Tuesdays at 06:00 UTC (one day after Dependabot)
-    - cron: '0 6 * * 2'
+    # Run daily at 06:00 UTC to sync with upstream OpenSCAD
+    - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
       dry-run:
