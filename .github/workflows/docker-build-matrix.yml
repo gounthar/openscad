@@ -17,9 +17,50 @@ env:
   VERSION: latest
 
 jobs:
+  # Check if upstream commit has changed since last release
+  check-changes:
+    runs-on: ubuntu-latest
+    # Only run change detection for scheduled builds
+    # Push and PR events should always build
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      current_commit: ${{ steps.check.outputs.current_commit }}
+      last_commit: ${{ steps.check.outputs.last_commit }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Check if upstream changed
+        id: check
+        run: |
+          # Extract current commit from Dockerfile
+          CURRENT_COMMIT=$(grep "ARG OPENSCAD_COMMIT=" docker/Dockerfile | sed 's/ARG OPENSCAD_COMMIT=//')
+          echo "current_commit=${CURRENT_COMMIT}" >> $GITHUB_OUTPUT
+          echo "Current upstream commit: ${CURRENT_COMMIT}"
+
+          # Get commit from last release (if exists)
+          LAST_COMMIT=$(gh release view --json body --jq '.body' 2>/dev/null | grep -oP 'OPENSCAD_COMMIT=\K[a-fA-F0-9]{40}' | head -1 || echo "none")
+          echo "last_commit=${LAST_COMMIT}" >> $GITHUB_OUTPUT
+          echo "Last release commit: ${LAST_COMMIT}"
+
+          if [ "$CURRENT_COMMIT" = "$LAST_COMMIT" ]; then
+            echo "✅ No upstream changes since last release - skipping build"
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          else
+            echo "🔄 Upstream changed: ${LAST_COMMIT} -> ${CURRENT_COMMIT}"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   # Build each architecture in parallel
   build:
     runs-on: ubuntu-latest
+    needs: check-changes
+    # Skip if change detection ran and found no changes
+    # Always run for push/PR events (when check-changes is skipped)
+    if: always() && (needs.check-changes.result == 'skipped' || needs.check-changes.outputs.should_build == 'true')
     strategy:
       fail-fast: false  # Continue other builds even if one fails
       matrix:
