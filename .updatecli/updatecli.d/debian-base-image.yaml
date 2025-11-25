@@ -17,10 +17,10 @@ sources:
     kind: dockerimage
     spec:
       image: debian
-      tagfilter: 'trixie-\\d{8}-slim'
+      tagfilter: 'trixie-\d{8}-slim'
       versionfilter:
         kind: regex
-        pattern: 'trixie-(\\d{8})-slim'
+        pattern: 'trixie-(\d{8})-slim'
 
 conditions:
   docker-image-exists:
@@ -36,7 +36,7 @@ targets:
     kind: file
     spec:
       file: docker/Dockerfile
-      matchpattern: 'FROM debian:trixie-\\d{8}-slim'
+      matchpattern: 'FROM debian:trixie-\d{8}-slim'
       replacepattern: 'FROM debian:{{ source "debian-trixie" }}'
     scmid: default
 
