@@ -16,9 +16,9 @@ sources:
     name: Get latest OpenSCAD commit from master branch
     kind: gitbranch
     spec:
-      owner: openscad
-      repository: openscad
+      url: https://github.com/openscad/openscad.git
       branch: master
+      key: hash
       versionfilter:
         kind: latest
 
