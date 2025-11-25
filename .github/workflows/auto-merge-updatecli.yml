@@ -1,0 +1,118 @@
+name: Auto-merge UpdateCLI PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  pull_request_review:
+    types: [submitted]
+  check_suite:
+    types: [completed]
+  status: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-merge UpdateCLI dependency updates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Get PR number from different event types
+        id: pr
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "pull_request_review" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "check_suite" ]; then
+            PR_NUMBER=$(gh pr list --search "${{ github.event.check_suite.head_sha }}" --json number --jq '.[0].number')
+            echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "status" ]; then
+            PR_NUMBER=$(gh pr list --search "${{ github.sha }}" --json number --jq '.[0].number')
+            echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if PR is ready to merge
+        id: check
+        run: |
+          PR_NUMBER="${{ steps.pr.outputs.number }}"
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No PR found"
+            echo "ready=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Get PR details
+          PR_DATA=$(gh pr view "$PR_NUMBER" --json title,author,state,mergeable,statusCheckRollup)
+
+          TITLE=$(echo "$PR_DATA" | jq -r '.title')
+          AUTHOR=$(echo "$PR_DATA" | jq -r '.author.login')
+          STATE=$(echo "$PR_DATA" | jq -r '.state')
+          MERGEABLE=$(echo "$PR_DATA" | jq -r '.mergeable')
+
+          echo "PR #$PR_NUMBER: $TITLE"
+          echo "Author: $AUTHOR"
+          echo "State: $STATE"
+          echo "Mergeable: $MERGEABLE"
+
+          # Verify PR matches our criteria
+          if [[ ! "$TITLE" =~ ^chore\(deps\):\ update\ (Debian\ base\ image|upstream\ OpenSCAD\ commit) ]]; then
+            echo "PR title doesn't match UpdateCLI pattern"
+            echo "ready=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "$AUTHOR" != "github-actions[bot]" ]; then
+            echo "PR not created by github-actions[bot]"
+            echo "ready=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "$STATE" != "OPEN" ]; then
+            echo "PR is not open"
+            echo "ready=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "$MERGEABLE" != "MERGEABLE" ]; then
+            echo "PR is not mergeable yet"
+            echo "ready=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Check status checks (excluding auto-merge itself and GitGuardian)
+          FAILING_CHECKS=$(echo "$PR_DATA" | jq -r '.statusCheckRollup[] | select(.status != "COMPLETED" or .conclusion != "SUCCESS") | select(.name != "Auto-merge UpdateCLI dependency updates" and .name != "GitGuardian Security Checks") | .name' | wc -l)
+
+          if [ "$FAILING_CHECKS" -gt 0 ]; then
+            echo "Some required checks are still pending or failed:"
+            echo "$PR_DATA" | jq -r '.statusCheckRollup[] | select(.status != "COMPLETED" or .conclusion != "SUCCESS") | select(.name != "Auto-merge UpdateCLI dependency updates" and .name != "GitGuardian Security Checks") | "\(.name): \(.status) / \(.conclusion)"'
+            echo "ready=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "All checks passed, PR is ready to merge"
+          echo "ready=true" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-merge PR
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          PR_NUMBER="${{ steps.pr.outputs.number }}"
+          echo "Auto-merging PR #$PR_NUMBER"
+          gh pr merge "$PR_NUMBER" --squash --delete-branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on merge
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          PR_NUMBER="${{ steps.pr.outputs.number }}"
+          gh pr comment "$PR_NUMBER" --body "Auto-merged UpdateCLI dependency update after all checks passed."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
