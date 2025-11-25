@@ -37,7 +37,7 @@ actions:
     kind: github/pullrequest
     scmid: default
     spec:
-      title: 'chore(deps): update upstream OpenSCAD to {{ source "openscad-latest-commit" | substr 0 7 }}'
+      title: 'chore(deps): update upstream OpenSCAD commit'
       labels:
         - dependencies
         - upstream-sync
@@ -46,11 +46,7 @@ actions:
 
         Updates the Docker build to use the latest commit from upstream OpenSCAD repository.
 
-        **Changes:**
-        - docker/Dockerfile: `ARG OPENSCAD_COMMIT={{ source "openscad-latest-commit" }}`
-
         **Upstream Repository:** https://github.com/openscad/openscad
-        **Commit:** https://github.com/openscad/openscad/commit/{{ source "openscad-latest-commit" }}
 
         **Verification Checklist:**
         - [ ] Docker build completes for all architectures (amd64, arm64, riscv64)

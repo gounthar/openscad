@@ -45,7 +45,7 @@ actions:
     kind: github/pullrequest
     scmid: default
     spec:
-      title: 'chore(deps): update Debian base image to {{ source "debian-trixie" }}'
+      title: 'chore(deps): update Debian base image'
       labels:
         - dependencies
         - docker
@@ -53,9 +53,6 @@ actions:
         ## Automated Debian Base Image Update
 
         Updates the Docker base image to the latest Debian Trixie release.
-
-        **Changes:**
-        - docker/Dockerfile: `FROM debian:{{ source "debian-trixie" }}`
 
         **Verification Checklist:**
         - [ ] Docker build completes for all architectures (amd64, arm64, riscv64)
