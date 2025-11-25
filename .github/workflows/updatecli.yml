@@ -34,7 +34,7 @@ jobs:
             --config .updatecli/updatecli.d/ \
             --values .updatecli/values.yaml
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATECLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run UpdateCLI (Apply)
         if: github.event.inputs.dry-run != 'true'
@@ -43,4 +43,4 @@ jobs:
             --config .updatecli/updatecli.d/ \
             --values .updatecli/values.yaml
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATECLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
