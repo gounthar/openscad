@@ -24,7 +24,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && ln -s /usr/bin/python3 /usr/bin/python \
     && python3 -m venv /tmp/venv \
-    && /tmp/venv/bin/pip install colorama codespell markdown pillow \
+    && /tmp/venv/bin/pip install --no-cache-dir \
+        codespell \
+        colorama \
+        markdown \
+        pillow \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
