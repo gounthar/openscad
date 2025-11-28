@@ -22,6 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     cmake \
     build-essential \
+    libjpeg-dev \
+    zlib1g-dev \
     && ln -s /usr/bin/python3 /usr/bin/python \
     && python3 -m venv /tmp/venv \
     && /tmp/venv/bin/pip install --no-cache-dir \
