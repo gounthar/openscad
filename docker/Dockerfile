@@ -47,7 +47,7 @@ RUN git clone https://github.com/openscad/openscad.git /openscad \
 RUN cd /openscad \
     && ./scripts/uni-get-dependencies.sh \
     && ./scripts/check-dependencies.sh \
-    && cmake -B build -DEXPERIMENTAL=1 \
+    && cmake -B build -DEXPERIMENTAL=1 -DENABLE_TESTS=OFF \
     && cmake --build build -j$(nproc) \
     && cmake --install build --prefix /usr/local \
     && mkdir -p /output \
