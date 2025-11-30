@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Clone the upstream OpenSCAD repository
 # Using specific commit for reproducible builds
-ARG OPENSCAD_COMMIT=43a5d0433d7c4b6713a1fb6b83fc5e2809a4b2e2
+ARG OPENSCAD_COMMIT=94aab85d61a11fb9d2fc9453b22641d4310e189c
 RUN git clone https://github.com/openscad/openscad.git /openscad \
     && cd /openscad \
     && git checkout ${OPENSCAD_COMMIT} \
