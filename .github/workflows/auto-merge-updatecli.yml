@@ -67,8 +67,9 @@ jobs:
             exit 0
           fi
 
-          if [ "$AUTHOR" != "github-actions[bot]" ]; then
-            echo "PR not created by github-actions[bot]"
+          # Check for both possible author formats from GitHub Actions
+          if [ "$AUTHOR" != "github-actions[bot]" ] && [ "$AUTHOR" != "app/github-actions" ] && [ "$AUTHOR" != "github-actions" ]; then
+            echo "PR not created by GitHub Actions (author: $AUTHOR)"
             echo "ready=false" >> $GITHUB_OUTPUT
             exit 0
           fi
