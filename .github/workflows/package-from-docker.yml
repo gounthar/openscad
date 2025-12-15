@@ -154,7 +154,7 @@ jobs:
           dpkg-deb --contents ${PKG_DIR}.deb | head -30
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: debian-amd64-docker
           path: "*.deb"
@@ -263,7 +263,7 @@ jobs:
           dpkg-deb --contents ${PKG_DIR}.deb | head -30
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: debian-arm64-docker
           path: "*.deb"
@@ -372,7 +372,7 @@ jobs:
           dpkg-deb --contents ${PKG_DIR}.deb | head -30
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: debian-riscv64-docker
           path: "*.deb"

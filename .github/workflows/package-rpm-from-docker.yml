@@ -145,7 +145,7 @@ jobs:
           ls -lh ~/rpmbuild/RPMS/${{ matrix.target }}/
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: rpm-${{ matrix.arch }}-docker
           path: /home/runner/rpmbuild/RPMS/${{ matrix.target }}/*.rpm
