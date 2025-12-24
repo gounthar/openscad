@@ -3,7 +3,7 @@
 # docker buildx build --platform linux/amd64,linux/arm64,linux/riscv64 -t gounthar/openscad:latest -f docker/Dockerfile .
 
 # Use Debian Trixie as the base image
-FROM debian:trixie-20251117-slim
+FROM debian:trixie-20251208-slim
 
 # Install necessary packages and libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Clone the upstream OpenSCAD repository
 # Using specific commit for reproducible builds
-ARG OPENSCAD_COMMIT=9def5354f47501a529020876091cfe3f750f791b
+ARG OPENSCAD_COMMIT=cfdd775c439094698f1c6e5595b7574f636af4da
 RUN git clone https://github.com/openscad/openscad.git /openscad \
     && cd /openscad \
     && git checkout ${OPENSCAD_COMMIT} \
