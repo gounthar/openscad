@@ -17,10 +17,11 @@ URL:            https://openscad.org/
 # Note: RPM automatically detects most library dependencies
 # Only list packages that need explicit declaration
 
-Requires:       qt5-qtbase
-Requires:       qt5-qtmultimedia
-Requires:       qt5-qtgamepad
-Requires:       qscintilla-qt5
+Requires:       qt6-qtbase
+Requires:       qt6-qtmultimedia
+Requires:       qt6-qtsvg
+Requires:       qt6-qt5compat
+Requires:       qscintilla-qt6
 Requires:       opencsg
 Requires:       lib3mf
 Requires:       mimalloc

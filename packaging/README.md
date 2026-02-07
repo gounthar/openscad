@@ -32,7 +32,7 @@ sudo apt-get build-dep .
 
 # Or manually install if apt-get build-dep doesn't work:
 # sudo apt-get install build-essential debhelper devscripts cmake \
-#     qtbase5-dev libcgal-dev libopencsg-dev libqscintilla2-qt5-dev \
+#     qt6-base-dev libcgal-dev libopencsg-dev libqscintilla2-qt6-dev \
 #     ... (see debian/control for full list)
 
 # Build package
@@ -97,7 +97,7 @@ runs-on: [self-hosted, linux, riscv64]
 
 1. **Debian Trixie** or **Ubuntu 24.04+** (for recent CGAL and dependencies)
 2. **Build tools**: `build-essential`, `cmake`, `git`
-3. **OpenSCAD dependencies**: Qt5, CGAL, Boost, etc.
+3. **OpenSCAD dependencies**: Qt6, CGAL, Boost, etc.
 4. **GitHub Actions runner**: [github-act-runner](https://github.com/ChristopherHX/github-act-runner) for riscv64
 
 #### Runner Registration
@@ -142,11 +142,11 @@ OpenSCAD builds are memory-intensive. Each compilation process can use 2-3GB of 
 Key build dependencies (see `debian/control` for full list):
 
 - `cmake` (>= 3.5)
-- `qtbase5-dev` (>= 5.4)
+- `qt6-base-dev`
 - `libcgal-dev` (>= 5.4)
 - `libopencsg-dev` (>= 1.3.0)
 - `libboost-dev` (>= 1.61.0)
-- `libqscintilla2-qt5-dev`
+- `libqscintilla2-qt6-dev`
 - `libeigen3-dev`
 - `libgmp-dev`, `libmpfr-dev`
 - `bison`, `flex`
