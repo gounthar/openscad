@@ -25,6 +25,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libjpeg-dev \
     zlib1g-dev \
+    qt6-base-dev \
+    qt6-base-dev-tools \
+    qt6-5compat-dev \
+    qt6-multimedia-dev \
+    qt6-svg-dev \
+    libqscintilla2-qt6-dev \
     && ln -s /usr/bin/python3 /usr/bin/python \
     && python3 -m venv /tmp/venv \
     && /tmp/venv/bin/pip install --no-cache-dir \

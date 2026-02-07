@@ -13,11 +13,12 @@ Source0:        https://github.com/openscad/openscad/archive/%{commit}/openscad-
 
 BuildRequires:  cmake >= 3.5
 BuildRequires:  gcc-c++
-BuildRequires:  qt5-qtbase-devel >= 5.4
+BuildRequires:  qt6-qtbase-devel
+BuildRequires:  qt6-qt5compat-devel
 BuildRequires:  CGAL-devel >= 5.4
 BuildRequires:  opencsg-devel >= 1.3.0
-BuildRequires:  qscintilla-qt5-devel
-BuildRequires:  qt5-qtmultimedia-devel
+BuildRequires:  qscintilla-qt6-devel
+BuildRequires:  qt6-qtmultimedia-devel
 BuildRequires:  freetype-devel
 BuildRequires:  fontconfig-devel
 BuildRequires:  harfbuzz-devel
@@ -28,8 +29,7 @@ BuildRequires:  libzip-devel
 BuildRequires:  cairo-devel
 BuildRequires:  lib3mf-devel
 BuildRequires:  libspnav-devel
-BuildRequires:  qt5-qtgamepad-devel
-BuildRequires:  qt5-qtsvg-devel
+BuildRequires:  qt6-qtsvg-devel
 BuildRequires:  bison >= 2.4
 BuildRequires:  flex >= 2.5.35
 BuildRequires:  glew-devel >= 1.5.4
@@ -48,10 +48,12 @@ BuildRequires:  double-conversion-devel
 BuildRequires:  tbb-devel
 BuildRequires:  git
 
-Requires:       qt5-qtbase
+Requires:       qt6-qtbase
+Requires:       qt6-qt5compat
+Requires:       qt6-qtsvg
 Requires:       CGAL
 Requires:       opencsg
-Requires:       qscintilla-qt5
+Requires:       qscintilla-qt6
 
 Recommends:     openscad-MCAD
 
