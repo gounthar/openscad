@@ -145,6 +145,44 @@ jobs:
             fi
           done
 
+      - name: Prune old packages (keep latest 3 per arch)
+        if: steps.check_artifacts.outputs.has_artifacts == 'true'
+        run: |
+          KEEP=3
+
+          for arch in x86_64 aarch64 riscv64; do
+            ARCH_DIR="rpm/fedora/${arch}"
+
+            # Skip if no packages exist
+            if ! ls "${ARCH_DIR}"/*.rpm 1>/dev/null 2>&1; then
+              continue
+            fi
+
+            # List packages sorted by version (oldest first)
+            PKGS=$(ls -1 "${ARCH_DIR}"/openscad-*.rpm 2>/dev/null | sort -V)
+            COUNT=$(echo "$PKGS" | grep -c . || true)
+
+            if [ "$COUNT" -gt "$KEEP" ]; then
+              REMOVE_COUNT=$((COUNT - KEEP))
+              echo "Pruning ${REMOVE_COUNT} old ${arch} RPMs (keeping latest ${KEEP})..."
+              echo "$PKGS" | head -n "$REMOVE_COUNT" | while read pkg; do
+                echo "  Removing: $(basename "$pkg")"
+                rm -f "$pkg"
+              done
+            else
+              echo "${arch}: ${COUNT} packages, nothing to prune"
+            fi
+          done
+
+          echo ""
+          echo "Packages after pruning:"
+          for arch in x86_64 aarch64 riscv64; do
+            if ls rpm/fedora/${arch}/*.rpm 1>/dev/null 2>&1; then
+              PKG_COUNT=$(ls -1 rpm/fedora/${arch}/*.rpm | wc -l)
+              echo "  ${arch}: ${PKG_COUNT} packages"
+            fi
+          done
+
       - name: Generate repository metadata for each architecture
         if: steps.check_artifacts.outputs.has_artifacts == 'true'
         run: |
@@ -159,17 +197,12 @@ jobs:
 
             echo "Creating repository metadata for ${arch}..."
 
-            # Create or update repository metadata
-            if [ -d "${ARCH_DIR}/repodata" ]; then
-              if ! createrepo_c --update "${ARCH_DIR}"; then
-                echo "Error: Failed to update repository metadata for ${arch}"
-                exit 1
-              fi
-            else
-              if ! createrepo_c "${ARCH_DIR}"; then
-                echo "Error: Failed to create repository metadata for ${arch}"
-                exit 1
-              fi
+            # Remove old repodata and recreate from scratch
+            # (required after pruning old packages)
+            rm -rf "${ARCH_DIR}/repodata"
+            if ! createrepo_c "${ARCH_DIR}"; then
+              echo "Error: Failed to create repository metadata for ${arch}"
+              exit 1
             fi
 
             # Count packages
