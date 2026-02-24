@@ -127,7 +127,7 @@ jobs:
             if [ "$COUNT" -gt "$KEEP" ]; then
               REMOVE_COUNT=$((COUNT - KEEP))
               echo "Pruning ${REMOVE_COUNT} old ${ARCH} packages (keeping latest ${KEEP})..."
-              echo "$PKGS" | head -n "$REMOVE_COUNT" | while read pkg; do
+              echo "$PKGS" | head -n "$REMOVE_COUNT" | while IFS= read -r pkg; do
                 echo "  Removing: $(basename "$pkg")"
                 rm -f "$pkg"
               done
@@ -138,8 +138,8 @@ jobs:
 
           echo ""
           echo "Packages after pruning:"
-          ls -1 "${POOL}"/*.deb | wc -l
-          ls -lh "${POOL}"/*.deb
+          ls -1 "${POOL}"/*.deb 2>/dev/null | wc -l || true
+          ls -lh "${POOL}"/*.deb 2>/dev/null || true
 
       - name: Generate Packages files for each architecture
         if: steps.check_artifacts.outputs.has_artifacts == 'true'
@@ -320,7 +320,7 @@ jobs:
 
                   # Restore our changes
                   cp -a "$TEMP_DIR"/debian-* downloads/ 2>/dev/null || true
-                  cp -a "$TEMP_DIR"/pool . 2>/dev/null || true
+                  rm -rf pool && cp -a "$TEMP_DIR"/pool . 2>/dev/null || true
                   cp -a "$TEMP_DIR"/dists . 2>/dev/null || true
                   cp -a "$TEMP_DIR"/debian . 2>/dev/null || true
                   cp -a "$TEMP_DIR"/index.html . 2>/dev/null || true

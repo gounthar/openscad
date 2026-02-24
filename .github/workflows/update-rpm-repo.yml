@@ -154,7 +154,7 @@ jobs:
             ARCH_DIR="rpm/fedora/${arch}"
 
             # Skip if no packages exist
-            if ! ls "${ARCH_DIR}"/*.rpm 1>/dev/null 2>&1; then
+            if ! ls "${ARCH_DIR}"/openscad-*.rpm 1>/dev/null 2>&1; then
               continue
             fi
 
@@ -165,7 +165,7 @@ jobs:
             if [ "$COUNT" -gt "$KEEP" ]; then
               REMOVE_COUNT=$((COUNT - KEEP))
               echo "Pruning ${REMOVE_COUNT} old ${arch} RPMs (keeping latest ${KEEP})..."
-              echo "$PKGS" | head -n "$REMOVE_COUNT" | while read pkg; do
+              echo "$PKGS" | head -n "$REMOVE_COUNT" | while IFS= read -r pkg; do
                 echo "  Removing: $(basename "$pkg")"
                 rm -f "$pkg"
               done
@@ -407,7 +407,7 @@ jobs:
 
                   # Restore our changes
                   cp -a "$TEMP_DIR"/rpm-* downloads/ 2>/dev/null || true
-                  cp -a "$TEMP_DIR"/rpm . 2>/dev/null || true
+                  rm -rf rpm && cp -a "$TEMP_DIR"/rpm . 2>/dev/null || true
                   cp -a "$TEMP_DIR"/index.html . 2>/dev/null || true
                   rm -rf "$TEMP_DIR"
 
