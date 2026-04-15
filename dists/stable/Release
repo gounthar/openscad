@@ -2,28 +2,28 @@ Origin: gounthar
 Label: OpenSCAD Multi-Arch
 Suite: stable
 Codename: stable
-Version: 2026.04.14
+Version: 2026.04.15
 Architectures: amd64 arm64 riscv64 
 Components: main
 Description: OpenSCAD packages for multiple architectures
-Date: Tue, 14 Apr 2026 04:44:44 +0000
+Date: Wed, 15 Apr 2026 04:45:40 +0000
 MD5Sum:
- d4789c8f37ceb5c58e9340ce8c3028b8             1024 main/binary-amd64/Packages.xz
- fc57a7f1c042432f603280c34f6c51db              942 main/binary-amd64/Packages.gz
- da69b931bbe6752de24587c5ff56a4e8             1671 main/binary-amd64/Packages
- 209452f24154f27677f33ce4ea8125bb             1024 main/binary-arm64/Packages.xz
- 741332a9976a9a770098993646e20f00              941 main/binary-arm64/Packages.gz
- d2419ed3ae8f8a21848bd128b26ee39d             1671 main/binary-arm64/Packages
- a40fec20019326b986630b8143e3f6a5             1028 main/binary-riscv64/Packages.xz
- 00127b0b1ff69d6e643bd5babd7acf73              946 main/binary-riscv64/Packages.gz
- cf4ac36e321f7af397c548dadd8c5021             1678 main/binary-riscv64/Packages
+ 8074125086dd1720ee35fa39a677c5cf             1024 main/binary-amd64/Packages.xz
+ 8f0afeb0e1aac70511f57d606611aad0              944 main/binary-amd64/Packages.gz
+ ad633466c6229a2d5b9ae3fcdd665736             1671 main/binary-amd64/Packages
+ d1ea264b494f5328da76b1c94fcbd631             1024 main/binary-arm64/Packages.xz
+ a97433bce32b83191e860db74f961f98              945 main/binary-arm64/Packages.gz
+ 331907b204d0933fba9ac909200aae83             1671 main/binary-arm64/Packages
+ 3ff91cfd7d1cc862d3ca0c642221f587             1028 main/binary-riscv64/Packages.xz
+ ece49b8b1d314d0a303377a2af86c510              946 main/binary-riscv64/Packages.gz
+ 9747f28d8ebd825d0bd1df0e30f68619             1678 main/binary-riscv64/Packages
 SHA256:
- e826da89dc54219f18662fa1ce0a66a61a5aebec1f977a558b6961f251da7c80             1024 main/binary-amd64/Packages.xz
- 9104214b2153af59e0752d0dd3b961c3fdf7392d186e8ceb33fc54581ff9c7b4              942 main/binary-amd64/Packages.gz
- 26cce7d472b79ceb8d73a3a4a01d178c0308939d5045f3dc4ecf8ccdcb065f1f             1671 main/binary-amd64/Packages
- ab7e0f24762a3cf23eb35fa82a8ff76b7fc41460e08ff8761cf4d906e5bdd392             1024 main/binary-arm64/Packages.xz
- 678242e0194d945cc7aabfdc67dfd726d0756e11a1bb56ff35bdbbd436355dbb              941 main/binary-arm64/Packages.gz
- c2b92a981d5a35fc26c978fa5040ddf70d96eab16ba1fea808163b35349ef7af             1671 main/binary-arm64/Packages
- 8015cf8abe866d413dcbcab910a8eb0889e9aee40c1c0d9f44678d76af21c0be             1028 main/binary-riscv64/Packages.xz
- eb4d47efcc89f04ce3659023c9f94b0c675c227654bec39249fcb9b81234a72d              946 main/binary-riscv64/Packages.gz
- a75e5afdac7b3ea1ffe3b0a78870331be9e69f9e9095daaae33514456e842320             1678 main/binary-riscv64/Packages
+ 49edb64511f5ff1efdb5ae1766f21850d9d86a183dba98ad4a76314971c85fa5             1024 main/binary-amd64/Packages.xz
+ 8a32ee661aa8349f4baea761a0f15d1b2d169a263989a01370595b177e4e5657              944 main/binary-amd64/Packages.gz
+ 0d58812717192895f1f0d6b8b408c9698928df3dcea817acaf6a00ff26984e85             1671 main/binary-amd64/Packages
+ f4c7b73a87b9493be164706ed17f8e69447dcbc78c34a3e9e586e65162d84e6a             1024 main/binary-arm64/Packages.xz
+ df8d2f0f5a8b26754dc1faf29d66da2b945df30e0c42e5ea779d8b71080601c2              945 main/binary-arm64/Packages.gz
+ 16b718ffec7cf7219986e7481f31d787e85f2b544d6b294568e39089c3bb33e0             1671 main/binary-arm64/Packages
+ 2d3bf4e8add618290a258d81045d11f4e52b747f33dcdebf3d357bef8aea6325             1028 main/binary-riscv64/Packages.xz
+ e92b5de83145a14705a947c0f3bc64d172d6769932b20ca67d5eda6438a299cf              946 main/binary-riscv64/Packages.gz
+ 82f11e899695ab557b9801042998ef0f1940f856c25e5ed1080b969172903b0c             1678 main/binary-riscv64/Packages
