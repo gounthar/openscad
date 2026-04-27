@@ -3,7 +3,7 @@
 # docker buildx build --platform linux/amd64,linux/arm64,linux/riscv64 -t gounthar/openscad:latest -f docker/Dockerfile .
 
 # Use Debian Trixie as the base image
-FROM debian:trixie-20260202-slim
+FROM debian:trixie-20260421-slim
 
 # Install necessary packages and libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
