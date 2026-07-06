@@ -5,44 +5,44 @@ Origin: gounthar
 Label: OpenSCAD Multi-Arch
 Suite: stable
 Codename: stable
-Version: 2026.07.05
+Version: 2026.07.06
 Architectures: amd64 arm64 riscv64 
 Components: main
 Description: OpenSCAD packages for multiple architectures
-Date: Sun, 05 Jul 2026 06:03:07 +0000
+Date: Mon, 06 Jul 2026 06:25:23 +0000
 MD5Sum:
- d7277363c4d0458b022cd58cd76c0051              946 main/binary-arm64/Packages.gz
- 22c7bd58e4bae6f051b0aebc5bf8bef3             1671 main/binary-arm64/Packages
- 35c4e54ecd16ea2373e53b69bd211fad             1024 main/binary-arm64/Packages.xz
- ddedf346936cd9860bb000ebbe2ed5f4              944 main/binary-riscv64/Packages.gz
- 9d2b1fb14c974a39ec5a374c33b71ff3             1678 main/binary-riscv64/Packages
- dd6329939919626c182b79cbc403ba36             1024 main/binary-riscv64/Packages.xz
- 74f0a231ea9c6752c8f9d5fb058b5682              943 main/binary-amd64/Packages.gz
- eccb1b65ad1c2737416b19c87863003e             1671 main/binary-amd64/Packages
- 9e4a467f016906eb475cdeda98dc1ebb             1020 main/binary-amd64/Packages.xz
+ 59d5209184560af066aa9d44282b8e99              944 main/binary-arm64/Packages.gz
+ 27e2bbaf94e3f16c5a7276bd667b62ec             1671 main/binary-arm64/Packages
+ 115b6789174da4e2b269dcaaa7ecb9ce             1024 main/binary-arm64/Packages.xz
+ fe98b42916e1de8e339d7ad95b5c67f4              945 main/binary-riscv64/Packages.gz
+ b07e460a7a01f8c0c68a1a34c8fc9768             1678 main/binary-riscv64/Packages
+ 3c4fcbadec592b0266c271dc91ca6163             1028 main/binary-riscv64/Packages.xz
+ 8816110dbbede54e7e355880c882981d              942 main/binary-amd64/Packages.gz
+ d4849a9f851cd963823a4218bb2864db             1671 main/binary-amd64/Packages
+ 76c8d5a7fc02418af713958efa95d538             1028 main/binary-amd64/Packages.xz
 SHA256:
- f50942282544a3475485e3b58d257c75d0a1b4534205f5735ee3edde88789ee6              946 main/binary-arm64/Packages.gz
- eef994de461f8fdcb219046bf35d22ea26d730f9c4df3e9ed138b2475df91759             1671 main/binary-arm64/Packages
- aac71d4a338e999f6dd010ac4298f1616bdbe07e620a553b7f99de602e22e43f             1024 main/binary-arm64/Packages.xz
- 79186babf296325d61a6a4de2b272609b90ce28a0bfdff7892d983d1d91e5dd8              944 main/binary-riscv64/Packages.gz
- 721852b24953a037624e4b80ce8b5bf9d7f5407258fbdd31647165ef63d22c5c             1678 main/binary-riscv64/Packages
- 082fcdab17b813de72dba27f7e52d96b5520806d870142d42c6c7b4c692c4740             1024 main/binary-riscv64/Packages.xz
- 010b8d45250893fd647e17d2addde1745bd16540c290e4421a76fbcaeed27f64              943 main/binary-amd64/Packages.gz
- 980b292dff5406de1ac6ad03b8eb2521d581408c6cde22e3a55d7473ae8077e5             1671 main/binary-amd64/Packages
- bb5cce9b1c807e8c66a3d07999532a558a4adec6c406ae1bae2c26c4f01e1f2c             1020 main/binary-amd64/Packages.xz
+ ee564dd5d1db536db26f8c51992e8ace83845ccd7fdd5f8712e990c4814a9c83              944 main/binary-arm64/Packages.gz
+ 44b8d6cd79a888b562b2c03dbbdaa8fa769b1feb1a93fabe38663556b724ad37             1671 main/binary-arm64/Packages
+ 96c97c2f2c73755a84a084e90dcf654ba655bc19cf854438dc3d3a6884181883             1024 main/binary-arm64/Packages.xz
+ 0e0cf88a4812cd321ef0491da94217f167797630a4f098c20b2a001f20558cbd              945 main/binary-riscv64/Packages.gz
+ 3d5cc029b2480d58afb44b2d7c79e71ea41e8b43e487fdfda8c029a9917faa90             1678 main/binary-riscv64/Packages
+ a7aae3c55d9876c0632e1a5647e553412fcc54b05773280a0d4d0af1c6416454             1028 main/binary-riscv64/Packages.xz
+ 25b98836f56b07ac61885400779024917a436ea6f025637d9e99394341d48a32              942 main/binary-amd64/Packages.gz
+ 0a276d3a37d5d9411333eb3500b79cf153a3c871e54bea3a6596587fb25997f2             1671 main/binary-amd64/Packages
+ 350435b31163c39ff9419beed450abc57d22cad02eda8caf2ec224e7baea2c0f             1028 main/binary-amd64/Packages.xz
 -----BEGIN PGP SIGNATURE-----
 
-iQIzBAEBCgAdFiEEVhiDQUJbAHQHIptI+xlj/DV1o50FAmpJ85sACgkQ+xlj/DV1
-o52Njw/+LkdL4ZiPyse173xb0K8auaEtS90lSmS5/IOp+/IBy6ZnSTIdrpSG/sW4
-b+W7tBAL7WN4wOdH8Db2n/EsLp3q72blywMFcylUR6N3dDG1mnJytO1QNg4isdfl
-A8F1kuGxVFq7d/ntRlgW0WzlkMUPX98pRQ+diLjW4loqlqlbxVcktKCnlF77B6gP
-AHg03uH9c4IaFVYISpHo23j6XZgWn72uz4Ox5SuFE5zSRlEUKV0ZWJCdnR7W1kEU
-AHal9SYqsNSDxr+F4GmibJ5+f2L1TM2uPItYcBjk9x1sXSinohmm5qkswSHcKrf1
-ccc/zAEoqIMEqS5U1YR8DT8Zrwf4Xry12q5ccHGXlbu459Ku9w08OJwogaJDUBAI
-qpreWlhkd6x/cZpE0f46TaPBms0JznqsvBtNdyb5y+d10H21YHrMaIz3iwh8JeBZ
-CqiUT3m6vxrCH43A2kN3y5fnVfxWDmMiaPD+kqnVZwHYULlwc9G3OEalju0v2GJx
-P6L3+aD9uhT2i9Ka9eQwDOLExrIdslKqBoUCj13UYKo3bYPrQ/oR7kO6jn2TweqS
-ds6lx/r6Cbx2YhYh86SudYkE3xfeUrqjPdJPqY4+Ztbm+4DwJEox8iDsWnC1Wllw
-j5KPmGjbEXnZkOqbX0/H3CxbcqL10gEB/htxWqtmiSc0/LEjEmw=
-=1KVu
+iQIzBAEBCgAdFiEEVhiDQUJbAHQHIptI+xlj/DV1o50FAmpLSlMACgkQ+xlj/DV1
+o50/Bg/+If82chwWk5o04K9X6ZkFVGTOsqBLv6RuXqqcTc99Rm+eU1Wnt16kPOZa
+PGCyoMZz1oJc6wJX42LskH/+ZkHDuUd/PsiwuYIDDVDGSkHp+HoOV0j0FiFIjzcs
+idTEzqT4O50HdY8MNoK05aJo4pODHq6EucTaIaD/aT53r5qfTJH+TTJOSL2vV8uX
+9ZeJ9B1fhNhxTMGtIfY3CGRQEnV2ws8wEZK93IOQLjT4R+bxZySaI/UmZoCegJfs
+S7WFr7sVJMAEp0e5eZHFmPZ7U5vu8ziKEoAbUdxB96HAvkjM6phPBjkXC0wWNs2k
+2OjXKFHz14iirqQzkt9q56d33ppGSP2X0FaP7RYrd5cT4kRUM5/9i6f6cIppyM++
+qRqF29bjkGHD3N/vXl7+hLGzzd8xQ664iwco/vpa6kxF+YRrUrbkxMrXPRhfl1w0
+JaKX1zmRmBHbB1zFJA0qv5aPqPQsa4SO4MZrB8m+u/GCxxThhDo+OUpVpDqMQPZw
+nEx3Kg0YomD7l0OdpyCTPyoKw38izUUF3VXffvIWv1HBNjs+oWx1UXgv8IWfngnO
+bYkolP9v7L8+ja8aGWJtOrP3Iy0CjQt8YOCs0S32BR9DK/JXNgBAwBG0EEDPepvq
+YRXo4zqojqmYPnWS5uxByEzYM48t6owEqBsjR+i3dNIStWQEeOg=
+=IiP5
 -----END PGP SIGNATURE-----
